@@ -29,6 +29,19 @@ type StudentForm = {
   privateNote: string;
   startingBalance: string;
   defaultLessonFee: string;
+
+  guardianFirstName: string;
+  guardianLastName: string;
+  guardianPhone: string;
+  guardianWhatsapp: string;
+  guardianEmail: string;
+
+  secondGuardianEnabled: boolean;
+  secondGuardianFirstName: string;
+  secondGuardianLastName: string;
+  secondGuardianPhone: string;
+  secondGuardianWhatsapp: string;
+  secondGuardianEmail: string;
 };
 
 const emptyStudentForm: StudentForm = {
@@ -40,6 +53,19 @@ const emptyStudentForm: StudentForm = {
   privateNote: "",
   startingBalance: "0",
   defaultLessonFee: "0",
+
+  guardianFirstName: "",
+  guardianLastName: "",
+  guardianPhone: "",
+  guardianWhatsapp: "",
+  guardianEmail: "",
+
+  secondGuardianEnabled: false,
+  secondGuardianFirstName: "",
+  secondGuardianLastName: "",
+  secondGuardianPhone: "",
+  secondGuardianWhatsapp: "",
+  secondGuardianEmail: "",
 };
 
 const roleLabels: Record<Profile["role"], string> = {
@@ -216,7 +242,26 @@ export default function Home() {
     }
 
     if (!studentForm.firstName.trim() || !studentForm.lastName.trim()) {
-      setStudentError("Ad ve soyad zorunludur.");
+      setStudentError("Öğrencinin adı ve soyadı zorunludur.");
+      return;
+    }
+
+    if (
+      !studentForm.guardianFirstName.trim() ||
+      !studentForm.guardianLastName.trim()
+    ) {
+      setStudentError("Birinci velinin adı ve soyadı zorunludur.");
+      return;
+    }
+
+    if (
+      studentForm.secondGuardianEnabled &&
+      (!studentForm.secondGuardianFirstName.trim() ||
+        !studentForm.secondGuardianLastName.trim())
+    ) {
+      setStudentError(
+        "İkinci veli açıksa ikinci velinin adı ve soyadı zorunludur."
+      );
       return;
     }
 
@@ -236,32 +281,82 @@ export default function Home() {
     setStudentSaving(true);
     setStudentError("");
 
-    const { error: insertError } = await supabase.from("students").insert({
-      teacher_id: profile.id,
-      first_name: studentForm.firstName.trim(),
-      last_name: studentForm.lastName.trim(),
-      birth_date: studentForm.birthDate || null,
-      grade_level: studentForm.gradeLevel.trim() || null,
-      subject: studentForm.subject.trim() || null,
-      private_note: studentForm.privateNote.trim() || null,
-      starting_balance: startingBalance,
-      default_lesson_fee: lessonFee,
-      active: true,
-    });
+    const { data: newStudent, error: insertError } = await supabase
+      .from("students")
+      .insert({
+        teacher_id: profile.id,
+        first_name: studentForm.firstName.trim(),
+        last_name: studentForm.lastName.trim(),
+        birth_date: studentForm.birthDate || null,
+        grade_level: studentForm.gradeLevel.trim() || null,
+        subject: studentForm.subject.trim() || null,
+        private_note: studentForm.privateNote.trim() || null,
+        starting_balance: startingBalance,
+        default_lesson_fee: lessonFee,
+        active: true,
+      })
+      .select("id")
+      .single();
 
-    if (insertError) {
-      setStudentError(`Öğrenci kaydedilemedi: ${insertError.message}`);
+    if (insertError || !newStudent) {
+      setStudentError(
+        `Öğrenci kaydedilemedi: ${insertError?.message ?? "Bilinmeyen hata"}`
+      );
+      setStudentSaving(false);
+      return;
+    }
+
+    const guardiansToInsert = [
+      {
+        teacher_id: profile.id,
+        student_id: newStudent.id,
+        first_name: studentForm.guardianFirstName.trim(),
+        last_name: studentForm.guardianLastName.trim(),
+        phone: studentForm.guardianPhone.trim() || null,
+        whatsapp_phone: studentForm.guardianWhatsapp.trim() || null,
+        email: studentForm.guardianEmail.trim() || null,
+        relation_label: "Veli",
+        is_primary: true,
+      },
+    ];
+
+    if (studentForm.secondGuardianEnabled) {
+      guardiansToInsert.push({
+        teacher_id: profile.id,
+        student_id: newStudent.id,
+        first_name: studentForm.secondGuardianFirstName.trim(),
+        last_name: studentForm.secondGuardianLastName.trim(),
+        phone: studentForm.secondGuardianPhone.trim() || null,
+        whatsapp_phone: studentForm.secondGuardianWhatsapp.trim() || null,
+        email: studentForm.secondGuardianEmail.trim() || null,
+        relation_label: "Veli",
+        is_primary: false,
+      });
+    }
+
+    const { error: guardianError } = await supabase
+      .from("guardians")
+      .insert(guardiansToInsert);
+
+    if (guardianError) {
+      await supabase.from("students").delete().eq("id", newStudent.id);
+
+      setStudentError(
+        `Veli bilgileri kaydedilemedi: ${guardianError.message}`
+      );
       setStudentSaving(false);
       return;
     }
 
     await loadStudents(profile.id);
+
+    const savedStudentName =
+      `${studentForm.firstName.trim()} ${studentForm.lastName.trim()}`;
+
     setStudentSaving(false);
     setStudentModalOpen(false);
     setStudentForm(emptyStudentForm);
-    setSuccessMessage(
-      `${studentForm.firstName.trim()} ${studentForm.lastName.trim()} başarıyla eklendi.`
-    );
+    setSuccessMessage(`${savedStudentName} ve veli bilgileri başarıyla eklendi.`);
 
     window.setTimeout(() => {
       setSuccessMessage("");
@@ -510,103 +605,292 @@ export default function Home() {
             </div>
 
             <form className="studentForm" onSubmit={handleAddStudent}>
-              <div className="formGrid">
-                <label>
-                  Ad *
-                  <input
-                    value={studentForm.firstName}
-                    onChange={(event) =>
-                      updateStudentField("firstName", event.target.value)
-                    }
-                    placeholder="Örn. Asel"
-                    required
-                  />
-                </label>
+              <div className="formSection">
+                <div className="formSectionTitle">
+                  <span>1</span>
+                  <div>
+                    <strong>Öğrenci bilgileri</strong>
+                    <small>Temel bilgiler, ders ve ücret</small>
+                  </div>
+                </div>
 
-                <label>
-                  Soyad *
-                  <input
-                    value={studentForm.lastName}
-                    onChange={(event) =>
-                      updateStudentField("lastName", event.target.value)
-                    }
-                    placeholder="Soyadı"
-                    required
-                  />
-                </label>
+                <div className="formGrid">
+                  <label>
+                    Ad *
+                    <input
+                      value={studentForm.firstName}
+                      onChange={(event) =>
+                        updateStudentField("firstName", event.target.value)
+                      }
+                      placeholder="Örn. Asel"
+                      required
+                    />
+                  </label>
 
-                <label>
-                  Doğum tarihi
-                  <input
-                    type="date"
-                    value={studentForm.birthDate}
-                    onChange={(event) =>
-                      updateStudentField("birthDate", event.target.value)
-                    }
-                  />
-                </label>
+                  <label>
+                    Soyad *
+                    <input
+                      value={studentForm.lastName}
+                      onChange={(event) =>
+                        updateStudentField("lastName", event.target.value)
+                      }
+                      placeholder="Soyadı"
+                      required
+                    />
+                  </label>
 
-                <label>
-                  Sınıf / seviye
-                  <input
-                    value={studentForm.gradeLevel}
-                    onChange={(event) =>
-                      updateStudentField("gradeLevel", event.target.value)
-                    }
-                    placeholder="Örn. 3. sınıf / A1"
-                  />
-                </label>
+                  <label>
+                    Doğum tarihi
+                    <input
+                      type="date"
+                      value={studentForm.birthDate}
+                      onChange={(event) =>
+                        updateStudentField("birthDate", event.target.value)
+                      }
+                    />
+                  </label>
 
-                <label>
-                  Ders
-                  <input
-                    value={studentForm.subject}
-                    onChange={(event) =>
-                      updateStudentField("subject", event.target.value)
-                    }
-                    placeholder="Örn. İngilizce"
-                  />
-                </label>
+                  <label>
+                    Sınıf / seviye
+                    <input
+                      value={studentForm.gradeLevel}
+                      onChange={(event) =>
+                        updateStudentField("gradeLevel", event.target.value)
+                      }
+                      placeholder="Örn. 3. sınıf / A1"
+                    />
+                  </label>
 
-                <label>
-                  Ders başına ücret (€)
+                  <label>
+                    Ders
+                    <input
+                      value={studentForm.subject}
+                      onChange={(event) =>
+                        updateStudentField("subject", event.target.value)
+                      }
+                      placeholder="Örn. İngilizce"
+                    />
+                  </label>
+
+                  <label>
+                    Ders başına ücret (€)
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={studentForm.defaultLessonFee}
+                      onChange={(event) =>
+                        updateStudentField(
+                          "defaultLessonFee",
+                          event.target.value
+                        )
+                      }
+                    />
+                  </label>
+
+                  <label>
+                    Başlangıç bakiyesi (€)
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={studentForm.startingBalance}
+                      onChange={(event) =>
+                        updateStudentField(
+                          "startingBalance",
+                          event.target.value
+                        )
+                      }
+                    />
+                  </label>
+
+                  <label className="fullWidth">
+                    Öğretmen özel notu
+                    <textarea
+                      value={studentForm.privateNote}
+                      onChange={(event) =>
+                        updateStudentField("privateNote", event.target.value)
+                      }
+                      placeholder="Bu not yalnızca öğretmen tarafında kullanılacak."
+                      rows={3}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="formSection">
+                <div className="formSectionTitle">
+                  <span>2</span>
+                  <div>
+                    <strong>Veli ve iletişim</strong>
+                    <small>Birinci veli bilgileri</small>
+                  </div>
+                </div>
+
+                <div className="formGrid">
+                  <label>
+                    Veli adı *
+                    <input
+                      value={studentForm.guardianFirstName}
+                      onChange={(event) =>
+                        updateStudentField(
+                          "guardianFirstName",
+                          event.target.value
+                        )
+                      }
+                      placeholder="Veli adı"
+                      required
+                    />
+                  </label>
+
+                  <label>
+                    Veli soyadı *
+                    <input
+                      value={studentForm.guardianLastName}
+                      onChange={(event) =>
+                        updateStudentField(
+                          "guardianLastName",
+                          event.target.value
+                        )
+                      }
+                      placeholder="Veli soyadı"
+                      required
+                    />
+                  </label>
+
+                  <label>
+                    Telefon
+                    <input
+                      type="tel"
+                      value={studentForm.guardianPhone}
+                      onChange={(event) =>
+                        updateStudentField("guardianPhone", event.target.value)
+                      }
+                      placeholder="+49..."
+                    />
+                  </label>
+
+                  <label>
+                    WhatsApp numarası
+                    <input
+                      type="tel"
+                      value={studentForm.guardianWhatsapp}
+                      onChange={(event) =>
+                        updateStudentField(
+                          "guardianWhatsapp",
+                          event.target.value
+                        )
+                      }
+                      placeholder="+49..."
+                    />
+                  </label>
+
+                  <label className="fullWidth">
+                    E-posta
+                    <input
+                      type="email"
+                      value={studentForm.guardianEmail}
+                      onChange={(event) =>
+                        updateStudentField("guardianEmail", event.target.value)
+                      }
+                      placeholder="veli@email.com"
+                    />
+                  </label>
+                </div>
+
+                <label className="toggleRow">
                   <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={studentForm.defaultLessonFee}
+                    type="checkbox"
+                    checked={studentForm.secondGuardianEnabled}
                     onChange={(event) =>
                       updateStudentField(
-                        "defaultLessonFee",
-                        event.target.value
+                        "secondGuardianEnabled",
+                        event.target.checked
                       )
                     }
                   />
+                  <span>İkinci veli ekle</span>
                 </label>
 
-                <label>
-                  Başlangıç bakiyesi (€)
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={studentForm.startingBalance}
-                    onChange={(event) =>
-                      updateStudentField("startingBalance", event.target.value)
-                    }
-                  />
-                </label>
+                {studentForm.secondGuardianEnabled ? (
+                  <div className="secondGuardianBox">
+                    <div className="formGrid">
+                      <label>
+                        İkinci veli adı *
+                        <input
+                          value={studentForm.secondGuardianFirstName}
+                          onChange={(event) =>
+                            updateStudentField(
+                              "secondGuardianFirstName",
+                              event.target.value
+                            )
+                          }
+                          placeholder="Ad"
+                          required
+                        />
+                      </label>
 
-                <label className="fullWidth">
-                  Öğretmen özel notu
-                  <textarea
-                    value={studentForm.privateNote}
-                    onChange={(event) =>
-                      updateStudentField("privateNote", event.target.value)
-                    }
-                    placeholder="Bu not yalnızca öğretmen tarafında kullanılacak."
-                    rows={4}
-                  />
-                </label>
+                      <label>
+                        İkinci veli soyadı *
+                        <input
+                          value={studentForm.secondGuardianLastName}
+                          onChange={(event) =>
+                            updateStudentField(
+                              "secondGuardianLastName",
+                              event.target.value
+                            )
+                          }
+                          placeholder="Soyad"
+                          required
+                        />
+                      </label>
+
+                      <label>
+                        Telefon
+                        <input
+                          type="tel"
+                          value={studentForm.secondGuardianPhone}
+                          onChange={(event) =>
+                            updateStudentField(
+                              "secondGuardianPhone",
+                              event.target.value
+                            )
+                          }
+                          placeholder="+49..."
+                        />
+                      </label>
+
+                      <label>
+                        WhatsApp numarası
+                        <input
+                          type="tel"
+                          value={studentForm.secondGuardianWhatsapp}
+                          onChange={(event) =>
+                            updateStudentField(
+                              "secondGuardianWhatsapp",
+                              event.target.value
+                            )
+                          }
+                          placeholder="+49..."
+                        />
+                      </label>
+
+                      <label className="fullWidth">
+                        E-posta
+                        <input
+                          type="email"
+                          value={studentForm.secondGuardianEmail}
+                          onChange={(event) =>
+                            updateStudentField(
+                              "secondGuardianEmail",
+                              event.target.value
+                            )
+                          }
+                          placeholder="veli2@email.com"
+                        />
+                      </label>
+                    </div>
+                  </div>
+                ) : null}
               </div>
 
               {studentError ? (
