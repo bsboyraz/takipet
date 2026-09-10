@@ -440,9 +440,16 @@ export default function Home() {
     setStudentSaving(true);
     setStudentError("");
 
-    const { data: newStudent, error: insertError } = await supabase
+    // ID'yi istemci tarafında oluşturuyoruz. Böylece INSERT sonrasında
+    // .select("id") / RETURNING çalıştırmak zorunda kalmıyoruz.
+    // Bu, RLS'nin yeni satırı RETURNING aşamasında tekrar SELECT etmesinden
+    // kaynaklanan hatayı önler.
+    const newStudentId = crypto.randomUUID();
+
+    const { error: insertError } = await supabase
       .from("students")
       .insert({
+        id: newStudentId,
         teacher_id: profile.id,
         first_name: studentForm.firstName.trim(),
         last_name: studentForm.lastName.trim(),
@@ -453,14 +460,10 @@ export default function Home() {
         starting_balance: startingBalance,
         default_lesson_fee: lessonFee,
         active: true,
-      })
-      .select("id")
-      .single();
+      });
 
-    if (insertError || !newStudent) {
-      setStudentError(
-        `Öğrenci kaydedilemedi: ${insertError?.message ?? "Bilinmeyen hata"}`
-      );
+    if (insertError) {
+      setStudentError(`Öğrenci kaydedilemedi: ${insertError.message}`);
       setStudentSaving(false);
       return;
     }
@@ -468,7 +471,7 @@ export default function Home() {
     const guardiansToInsert = [
       {
         teacher_id: profile.id,
-        student_id: newStudent.id,
+        student_id: newStudentId,
         first_name: studentForm.guardianFirstName.trim(),
         last_name: studentForm.guardianLastName.trim(),
         phone: studentForm.guardianPhone.trim() || null,
@@ -482,7 +485,7 @@ export default function Home() {
     if (studentForm.secondGuardianEnabled) {
       guardiansToInsert.push({
         teacher_id: profile.id,
-        student_id: newStudent.id,
+        student_id: newStudentId,
         first_name: studentForm.secondGuardianFirstName.trim(),
         last_name: studentForm.secondGuardianLastName.trim(),
         phone: studentForm.secondGuardianPhone.trim() || null,
@@ -498,7 +501,7 @@ export default function Home() {
       .insert(guardiansToInsert);
 
     if (guardianError) {
-      await supabase.from("students").delete().eq("id", newStudent.id);
+      await supabase.from("students").delete().eq("id", newStudentId);
       setStudentError(
         `Veli bilgileri kaydedilemedi: ${guardianError.message}`
       );
@@ -507,14 +510,14 @@ export default function Home() {
     }
 
     if (studentForm.scheduleEnabled) {
-      lessonRows = buildLessonRows(newStudent.id, profile.id);
+      lessonRows = buildLessonRows(newStudentId, profile.id);
 
       const { error: lessonError } = await supabase
         .from("lessons")
         .insert(lessonRows);
 
       if (lessonError) {
-        await supabase.from("students").delete().eq("id", newStudent.id);
+        await supabase.from("students").delete().eq("id", newStudentId);
         setStudentError(
           `Ders programı kaydedilemedi: ${lessonError.message}`
         );
