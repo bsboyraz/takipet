@@ -20,6 +20,61 @@ type Student = {
   active: boolean;
 };
 
+
+type Lesson = {
+  id: string;
+  student_id: string;
+  title: string;
+  starts_at: string;
+  ends_at: string;
+  lesson_type: "online" | "in_person";
+  status: "planned" | "completed" | "no_show" | "cancelled";
+  meeting_url: string | null;
+  fee: number;
+  students:
+    | {
+        first_name: string;
+        last_name: string;
+      }
+    | {
+        first_name: string;
+        last_name: string;
+      }[]
+    | null;
+};
+
+function startOfWeek(date: Date) {
+  const result = new Date(date);
+  result.setHours(0, 0, 0, 0);
+  const mondayOffset = (result.getDay() + 6) % 7;
+  result.setDate(result.getDate() - mondayOffset);
+  return result;
+}
+
+function addDays(date: Date, amount: number) {
+  const result = new Date(date);
+  result.setDate(result.getDate() + amount);
+  return result;
+}
+
+function sameLocalDay(a: Date, b: Date) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function studentNameFromLesson(lesson: Lesson) {
+  const relation = Array.isArray(lesson.students)
+    ? lesson.students[0]
+    : lesson.students;
+
+  if (!relation) return "Öğrenci";
+
+  return `${relation.first_name} ${relation.last_name}`.trim();
+}
+
 type StudentForm = {
   firstName: string;
   lastName: string;
@@ -100,6 +155,11 @@ export default function Home() {
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [currentWeekLessonCount, setCurrentWeekLessonCount] = useState(0);
+  const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
+  const [deletingStudent, setDeletingStudent] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -114,6 +174,16 @@ export default function Home() {
   const [studentStep, setStudentStep] = useState<1 | 2 | 3>(1);
   const [studentForm, setStudentForm] =
     useState<StudentForm>(emptyStudentForm);
+
+  const visibleWeekStart = useMemo(() => {
+    const monday = startOfWeek(new Date());
+    return addDays(monday, weekOffset * 7);
+  }, [weekOffset]);
+
+  const visibleWeekDays = useMemo(
+    () => Array.from({ length: 7 }, (_, index) => addDays(visibleWeekStart, index)),
+    [visibleWeekStart]
+  );
 
   useEffect(() => {
     let active = true;
@@ -162,6 +232,12 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase]);
 
+  useEffect(() => {
+    if (!profile || profile.role !== "teacher") return;
+    loadLessons(profile.id, weekOffset);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.id, profile?.role, weekOffset]);
+
   async function loadStudents(teacherId: string) {
     const { data, error: studentsError } = await supabase
       .from("students")
@@ -177,6 +253,34 @@ export default function Home() {
     }
 
     setStudents((data ?? []) as Student[]);
+  }
+
+  async function loadLessons(teacherId: string, offset = weekOffset) {
+    const monday = startOfWeek(new Date());
+    const rangeStart = addDays(monday, offset * 7);
+    const rangeEnd = addDays(rangeStart, 7);
+
+    const { data, error: lessonsError } = await supabase
+      .from("lessons")
+      .select(
+        "id, student_id, title, starts_at, ends_at, lesson_type, status, meeting_url, fee, students(first_name, last_name)"
+      )
+      .eq("teacher_id", teacherId)
+      .gte("starts_at", rangeStart.toISOString())
+      .lt("starts_at", rangeEnd.toISOString())
+      .order("starts_at", { ascending: true });
+
+    if (lessonsError) {
+      setError(`Dersler yüklenemedi: ${lessonsError.message}`);
+      return;
+    }
+
+    const loadedLessons = (data ?? []) as Lesson[];
+    setLessons(loadedLessons);
+
+    if (offset === 0) {
+      setCurrentWeekLessonCount(loadedLessons.length);
+    }
   }
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
@@ -224,8 +328,43 @@ export default function Home() {
     await supabase.auth.signOut();
     setProfile(null);
     setStudents([]);
+    setLessons([]);
+    setWeekOffset(0);
+    setCurrentWeekLessonCount(0);
     setEmail("");
     setPassword("");
+  }
+
+  async function handleDeleteStudent() {
+    if (!profile || !studentToDelete || profile.role !== "teacher") return;
+
+    setDeletingStudent(true);
+    setError("");
+
+    const { error: deleteError } = await supabase
+      .from("students")
+      .delete()
+      .eq("id", studentToDelete.id)
+      .eq("teacher_id", profile.id);
+
+    if (deleteError) {
+      setError(`Öğrenci silinemedi: ${deleteError.message}`);
+      setDeletingStudent(false);
+      return;
+    }
+
+    const deletedName =
+      `${studentToDelete.first_name} ${studentToDelete.last_name}`.trim();
+
+    setStudentToDelete(null);
+    setDeletingStudent(false);
+    await Promise.all([
+      loadStudents(profile.id),
+      loadLessons(profile.id, weekOffset),
+    ]);
+
+    setSuccessMessage(`${deletedName} ve bağlı kayıtları silindi.`);
+    window.setTimeout(() => setSuccessMessage(""), 4000);
   }
 
   function openStudentModal() {
@@ -526,7 +665,10 @@ export default function Home() {
       }
     }
 
-    await loadStudents(profile.id);
+    await Promise.all([
+      loadStudents(profile.id),
+      loadLessons(profile.id, weekOffset),
+    ]);
 
     const savedStudentName =
       `${studentForm.firstName.trim()} ${studentForm.lastName.trim()}`;
@@ -696,7 +838,7 @@ export default function Home() {
         </article>
         <article className="statCard">
           <span>Bu hafta ders</span>
-          <strong>0</strong>
+          <strong>{currentWeekLessonCount}</strong>
         </article>
         <article className="statCard">
           <span>Bekleyen ödev</span>
@@ -706,6 +848,124 @@ export default function Home() {
           <span>Yaklaşan test</span>
           <strong>0</strong>
         </article>
+      </section>
+
+      <section className="weekCalendarCard">
+        <div className="calendarTop">
+          <div>
+            <span className="eyebrow">TAKVİM</span>
+            <h2>
+              {visibleWeekStart.toLocaleDateString("tr-TR", {
+                day: "2-digit",
+                month: "short",
+              })}
+              {" – "}
+              {addDays(visibleWeekStart, 6).toLocaleDateString("tr-TR", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              })}
+            </h2>
+          </div>
+
+          <div className="calendarNav">
+            <button
+              type="button"
+              className="calendarNavButton"
+              onClick={() => setWeekOffset((value) => value - 1)}
+              aria-label="Önceki hafta"
+            >
+              ←
+            </button>
+            <button
+              type="button"
+              className="calendarTodayButton"
+              onClick={() => setWeekOffset(0)}
+            >
+              Bugün
+            </button>
+            <button
+              type="button"
+              className="calendarNavButton"
+              onClick={() => setWeekOffset((value) => value + 1)}
+              aria-label="Sonraki hafta"
+            >
+              →
+            </button>
+          </div>
+        </div>
+
+        <div className="weekCalendarScroll">
+          <div className="weekCalendarGrid">
+            {visibleWeekDays.map((day) => {
+              const dayLessons = lessons.filter((lesson) =>
+                sameLocalDay(new Date(lesson.starts_at), day)
+              );
+              const isToday = sameLocalDay(day, new Date());
+
+              return (
+                <div
+                  className={`calendarDayColumn ${isToday ? "today" : ""}`}
+                  key={day.toISOString()}
+                >
+                  <div className="calendarDayHeader">
+                    <span>
+                      {day
+                        .toLocaleDateString("tr-TR", { weekday: "short" })
+                        .replace(".", "")}
+                    </span>
+                    <strong>{day.getDate()}</strong>
+                  </div>
+
+                  <div className="calendarDayLessons">
+                    {dayLessons.length === 0 ? (
+                      <div className="calendarEmptyDay">—</div>
+                    ) : (
+                      dayLessons.map((lesson) => {
+                        const start = new Date(lesson.starts_at);
+                        const end = new Date(lesson.ends_at);
+
+                        return (
+                          <article className="calendarLesson" key={lesson.id}>
+                            <div className="calendarLessonTime">
+                              {start.toLocaleTimeString("tr-TR", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                              {" – "}
+                              {end.toLocaleTimeString("tr-TR", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </div>
+                            <strong>{studentNameFromLesson(lesson)}</strong>
+                            <span>{lesson.title}</span>
+                            <small>
+                              {lesson.lesson_type === "online"
+                                ? "Online"
+                                : "Yüz yüze"}
+                            </small>
+
+                            {lesson.lesson_type === "online" &&
+                            lesson.meeting_url ? (
+                              <a
+                                href={lesson.meeting_url}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                Derse katıl ↗
+                              </a>
+                            ) : null}
+                          </article>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </section>
 
       <section className="contentGrid">
@@ -747,6 +1007,16 @@ export default function Home() {
                     {Number(student.default_lesson_fee || 0).toFixed(2)} €
                     <span>/ ders</span>
                   </div>
+
+                  <button
+                    type="button"
+                    className="studentDeleteButton"
+                    onClick={() => setStudentToDelete(student)}
+                    aria-label={`${student.first_name} ${student.last_name} öğrencisini sil`}
+                    title="Öğrenciyi sil"
+                  >
+                    🗑
+                  </button>
                 </article>
               ))}
             </div>
@@ -762,6 +1032,52 @@ export default function Home() {
           <div className="checkItem">✓ Öğrenci ekleme</div>
         </aside>
       </section>
+
+      {studentToDelete ? (
+        <div
+          className="modalBackdrop"
+          onMouseDown={() => {
+            if (!deletingStudent) setStudentToDelete(null);
+          }}
+        >
+          <section
+            className="confirmCard"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-student-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="dangerIcon">🗑</div>
+            <h2 id="delete-student-title">Öğrenciyi sil?</h2>
+            <p>
+              <strong>
+                {studentToDelete.first_name} {studentToDelete.last_name}
+              </strong>{" "}
+              silinecek. Bu öğrenciye bağlı dersler, veli kayıtları, ödevler,
+              test kayıtları ve ödeme hareketleri de silinir.
+            </p>
+
+            <div className="confirmActions">
+              <button
+                type="button"
+                className="secondaryButton"
+                onClick={() => setStudentToDelete(null)}
+                disabled={deletingStudent}
+              >
+                Vazgeç
+              </button>
+              <button
+                type="button"
+                className="dangerButton"
+                onClick={handleDeleteStudent}
+                disabled={deletingStudent}
+              >
+                {deletingStudent ? "Siliniyor…" : "Evet, öğrenciyi sil"}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       {studentModalOpen ? (
         <div className="modalBackdrop" onMouseDown={closeStudentModal}>
