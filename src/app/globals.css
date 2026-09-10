@@ -726,3 +726,143 @@ button {
   background: #fafafa;
   border: 1px dashed #dedede;
 }
+
+
+/* ===== Professional 2-step student wizard ===== */
+
+.stepper {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 70px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  margin: 2px 0 8px;
+}
+
+.stepItem {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  color: var(--muted);
+}
+
+.stepItem > span {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.stepItem strong,
+.stepItem small {
+  display: block;
+}
+
+.stepItem strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.stepItem small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.stepItem.active > span {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(244, 124, 60, 0.22);
+}
+
+.stepItem.done > span {
+  background: #e8f5ec;
+  border-color: #cce7d4;
+  color: #28663a;
+}
+
+.stepLine {
+  height: 2px;
+  border-radius: 999px;
+  background: #ececef;
+}
+
+.stepPanel {
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
+}
+
+.stepPanelHeader h3 {
+  margin: 6px 0 5px;
+  font-size: 22px;
+}
+
+.stepPanelHeader p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.secondGuardianHeader {
+  margin-bottom: 12px;
+}
+
+.secondGuardianHeader strong,
+.secondGuardianHeader small {
+  display: block;
+}
+
+.secondGuardianHeader small {
+  margin-top: 3px;
+  color: var(--muted);
+}
+
+.wizardActions {
+  padding-top: 2px;
+}
+
+@media (max-width: 650px) {
+  .stepper {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .stepLine {
+    display: none;
+  }
+
+  .stepItem {
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+  }
+
+  .stepItem.active {
+    background: #fff7f2;
+    border-color: #f5d7c6;
+  }
+
+  .stepPanel {
+    padding: 16px;
+  }
+
+  .wizardActions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}
