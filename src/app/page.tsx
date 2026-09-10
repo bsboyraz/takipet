@@ -93,6 +93,7 @@ export default function Home() {
 
   const [quickMenuOpen, setQuickMenuOpen] = useState(false);
   const [studentModalOpen, setStudentModalOpen] = useState(false);
+  const [studentStep, setStudentStep] = useState<1 | 2>(1);
   const [studentForm, setStudentForm] =
     useState<StudentForm>(emptyStudentForm);
 
@@ -211,6 +212,7 @@ export default function Home() {
 
   function openStudentModal() {
     setStudentForm(emptyStudentForm);
+    setStudentStep(1);
     setStudentError("");
     setSuccessMessage("");
     setQuickMenuOpen(false);
@@ -231,6 +233,30 @@ export default function Home() {
       ...current,
       [field]: value,
     }));
+  }
+
+  function goToGuardianStep() {
+    setStudentError("");
+
+    if (!studentForm.firstName.trim() || !studentForm.lastName.trim()) {
+      setStudentError("Devam etmek için öğrencinin adı ve soyadı zorunludur.");
+      return;
+    }
+
+    const startingBalance = Number(studentForm.startingBalance || 0);
+    const lessonFee = Number(studentForm.defaultLessonFee || 0);
+
+    if (Number.isNaN(startingBalance) || Number.isNaN(lessonFee)) {
+      setStudentError("Bakiye ve ders ücreti sayı olmalıdır.");
+      return;
+    }
+
+    if (lessonFee < 0) {
+      setStudentError("Ders ücreti negatif olamaz.");
+      return;
+    }
+
+    setStudentStep(2);
   }
 
   async function handleAddStudent(event: FormEvent<HTMLFormElement>) {
@@ -605,314 +631,372 @@ export default function Home() {
             </div>
 
             <form className="studentForm" onSubmit={handleAddStudent}>
-              <div className="formSection">
-                <div className="formSectionTitle">
+              <div className="stepper">
+                <button
+                  type="button"
+                  className={`stepItem ${studentStep === 1 ? "active" : "done"}`}
+                  onClick={() => setStudentStep(1)}
+                >
                   <span>1</span>
                   <div>
                     <strong>Öğrenci bilgileri</strong>
-                    <small>Temel bilgiler, ders ve ücret</small>
+                    <small>Temel bilgiler ve ücret</small>
                   </div>
-                </div>
+                </button>
 
-                <div className="formGrid">
-                  <label>
-                    Ad *
-                    <input
-                      value={studentForm.firstName}
-                      onChange={(event) =>
-                        updateStudentField("firstName", event.target.value)
-                      }
-                      placeholder="Örn. Asel"
-                      required
-                    />
-                  </label>
+                <div className="stepLine" />
 
-                  <label>
-                    Soyad *
-                    <input
-                      value={studentForm.lastName}
-                      onChange={(event) =>
-                        updateStudentField("lastName", event.target.value)
-                      }
-                      placeholder="Soyadı"
-                      required
-                    />
-                  </label>
-
-                  <label>
-                    Doğum tarihi
-                    <input
-                      type="date"
-                      value={studentForm.birthDate}
-                      onChange={(event) =>
-                        updateStudentField("birthDate", event.target.value)
-                      }
-                    />
-                  </label>
-
-                  <label>
-                    Sınıf / seviye
-                    <input
-                      value={studentForm.gradeLevel}
-                      onChange={(event) =>
-                        updateStudentField("gradeLevel", event.target.value)
-                      }
-                      placeholder="Örn. 3. sınıf / A1"
-                    />
-                  </label>
-
-                  <label>
-                    Ders
-                    <input
-                      value={studentForm.subject}
-                      onChange={(event) =>
-                        updateStudentField("subject", event.target.value)
-                      }
-                      placeholder="Örn. İngilizce"
-                    />
-                  </label>
-
-                  <label>
-                    Ders başına ücret (€)
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={studentForm.defaultLessonFee}
-                      onChange={(event) =>
-                        updateStudentField(
-                          "defaultLessonFee",
-                          event.target.value
-                        )
-                      }
-                    />
-                  </label>
-
-                  <label>
-                    Başlangıç bakiyesi (€)
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={studentForm.startingBalance}
-                      onChange={(event) =>
-                        updateStudentField(
-                          "startingBalance",
-                          event.target.value
-                        )
-                      }
-                    />
-                  </label>
-
-                  <label className="fullWidth">
-                    Öğretmen özel notu
-                    <textarea
-                      value={studentForm.privateNote}
-                      onChange={(event) =>
-                        updateStudentField("privateNote", event.target.value)
-                      }
-                      placeholder="Bu not yalnızca öğretmen tarafında kullanılacak."
-                      rows={3}
-                    />
-                  </label>
-                </div>
-              </div>
-
-              <div className="formSection">
-                <div className="formSectionTitle">
+                <button
+                  type="button"
+                  className={`stepItem ${studentStep === 2 ? "active" : ""}`}
+                  onClick={() => {
+                    if (studentStep === 2) return;
+                    goToGuardianStep();
+                  }}
+                >
                   <span>2</span>
                   <div>
                     <strong>Veli ve iletişim</strong>
-                    <small>Birinci veli bilgileri</small>
+                    <small>İletişim ve WhatsApp</small>
                   </div>
-                </div>
-
-                <div className="formGrid">
-                  <label>
-                    Veli adı *
-                    <input
-                      value={studentForm.guardianFirstName}
-                      onChange={(event) =>
-                        updateStudentField(
-                          "guardianFirstName",
-                          event.target.value
-                        )
-                      }
-                      placeholder="Veli adı"
-                      required
-                    />
-                  </label>
-
-                  <label>
-                    Veli soyadı *
-                    <input
-                      value={studentForm.guardianLastName}
-                      onChange={(event) =>
-                        updateStudentField(
-                          "guardianLastName",
-                          event.target.value
-                        )
-                      }
-                      placeholder="Veli soyadı"
-                      required
-                    />
-                  </label>
-
-                  <label>
-                    Telefon
-                    <input
-                      type="tel"
-                      value={studentForm.guardianPhone}
-                      onChange={(event) =>
-                        updateStudentField("guardianPhone", event.target.value)
-                      }
-                      placeholder="+49..."
-                    />
-                  </label>
-
-                  <label>
-                    WhatsApp numarası
-                    <input
-                      type="tel"
-                      value={studentForm.guardianWhatsapp}
-                      onChange={(event) =>
-                        updateStudentField(
-                          "guardianWhatsapp",
-                          event.target.value
-                        )
-                      }
-                      placeholder="+49..."
-                    />
-                  </label>
-
-                  <label className="fullWidth">
-                    E-posta
-                    <input
-                      type="email"
-                      value={studentForm.guardianEmail}
-                      onChange={(event) =>
-                        updateStudentField("guardianEmail", event.target.value)
-                      }
-                      placeholder="veli@email.com"
-                    />
-                  </label>
-                </div>
-
-                <label className="toggleRow">
-                  <input
-                    type="checkbox"
-                    checked={studentForm.secondGuardianEnabled}
-                    onChange={(event) =>
-                      updateStudentField(
-                        "secondGuardianEnabled",
-                        event.target.checked
-                      )
-                    }
-                  />
-                  <span>İkinci veli ekle</span>
-                </label>
-
-                {studentForm.secondGuardianEnabled ? (
-                  <div className="secondGuardianBox">
-                    <div className="formGrid">
-                      <label>
-                        İkinci veli adı *
-                        <input
-                          value={studentForm.secondGuardianFirstName}
-                          onChange={(event) =>
-                            updateStudentField(
-                              "secondGuardianFirstName",
-                              event.target.value
-                            )
-                          }
-                          placeholder="Ad"
-                          required
-                        />
-                      </label>
-
-                      <label>
-                        İkinci veli soyadı *
-                        <input
-                          value={studentForm.secondGuardianLastName}
-                          onChange={(event) =>
-                            updateStudentField(
-                              "secondGuardianLastName",
-                              event.target.value
-                            )
-                          }
-                          placeholder="Soyad"
-                          required
-                        />
-                      </label>
-
-                      <label>
-                        Telefon
-                        <input
-                          type="tel"
-                          value={studentForm.secondGuardianPhone}
-                          onChange={(event) =>
-                            updateStudentField(
-                              "secondGuardianPhone",
-                              event.target.value
-                            )
-                          }
-                          placeholder="+49..."
-                        />
-                      </label>
-
-                      <label>
-                        WhatsApp numarası
-                        <input
-                          type="tel"
-                          value={studentForm.secondGuardianWhatsapp}
-                          onChange={(event) =>
-                            updateStudentField(
-                              "secondGuardianWhatsapp",
-                              event.target.value
-                            )
-                          }
-                          placeholder="+49..."
-                        />
-                      </label>
-
-                      <label className="fullWidth">
-                        E-posta
-                        <input
-                          type="email"
-                          value={studentForm.secondGuardianEmail}
-                          onChange={(event) =>
-                            updateStudentField(
-                              "secondGuardianEmail",
-                              event.target.value
-                            )
-                          }
-                          placeholder="veli2@email.com"
-                        />
-                      </label>
-                    </div>
-                  </div>
-                ) : null}
+                </button>
               </div>
+
+              {studentStep === 1 ? (
+                <div className="stepPanel">
+                  <div className="stepPanelHeader">
+                    <span className="eyebrow">ADIM 1 / 2</span>
+                    <h3>Öğrenci bilgileri</h3>
+                    <p>Öğrencinin temel bilgilerini ve ders ücretini gir.</p>
+                  </div>
+
+                  <div className="formGrid">
+                    <label>
+                      Ad *
+                      <input
+                        value={studentForm.firstName}
+                        onChange={(event) =>
+                          updateStudentField("firstName", event.target.value)
+                        }
+                        placeholder="Örn. Asel"
+                        required
+                      />
+                    </label>
+
+                    <label>
+                      Soyad *
+                      <input
+                        value={studentForm.lastName}
+                        onChange={(event) =>
+                          updateStudentField("lastName", event.target.value)
+                        }
+                        placeholder="Soyadı"
+                        required
+                      />
+                    </label>
+
+                    <label>
+                      Doğum tarihi
+                      <input
+                        type="date"
+                        value={studentForm.birthDate}
+                        onChange={(event) =>
+                          updateStudentField("birthDate", event.target.value)
+                        }
+                      />
+                    </label>
+
+                    <label>
+                      Sınıf / seviye
+                      <input
+                        value={studentForm.gradeLevel}
+                        onChange={(event) =>
+                          updateStudentField("gradeLevel", event.target.value)
+                        }
+                        placeholder="Örn. 3. sınıf / A1"
+                      />
+                    </label>
+
+                    <label>
+                      Ders
+                      <input
+                        value={studentForm.subject}
+                        onChange={(event) =>
+                          updateStudentField("subject", event.target.value)
+                        }
+                        placeholder="Örn. İngilizce"
+                      />
+                    </label>
+
+                    <label>
+                      Ders başına ücret (€)
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={studentForm.defaultLessonFee}
+                        onChange={(event) =>
+                          updateStudentField(
+                            "defaultLessonFee",
+                            event.target.value
+                          )
+                        }
+                      />
+                    </label>
+
+                    <label>
+                      Başlangıç bakiyesi (€)
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={studentForm.startingBalance}
+                        onChange={(event) =>
+                          updateStudentField(
+                            "startingBalance",
+                            event.target.value
+                          )
+                        }
+                      />
+                    </label>
+
+                    <label className="fullWidth">
+                      Öğretmen özel notu
+                      <textarea
+                        value={studentForm.privateNote}
+                        onChange={(event) =>
+                          updateStudentField("privateNote", event.target.value)
+                        }
+                        placeholder="Bu not yalnızca öğretmen tarafında kullanılacak."
+                        rows={3}
+                      />
+                    </label>
+                  </div>
+                </div>
+              ) : (
+                <div className="stepPanel">
+                  <div className="stepPanelHeader">
+                    <span className="eyebrow">ADIM 2 / 2</span>
+                    <h3>Veli ve iletişim</h3>
+                    <p>Veli iletişim bilgilerini ve WhatsApp numarasını ekle.</p>
+                  </div>
+
+                  <div className="formGrid">
+                    <label>
+                      Veli adı *
+                      <input
+                        value={studentForm.guardianFirstName}
+                        onChange={(event) =>
+                          updateStudentField(
+                            "guardianFirstName",
+                            event.target.value
+                          )
+                        }
+                        placeholder="Veli adı"
+                        required
+                      />
+                    </label>
+
+                    <label>
+                      Veli soyadı *
+                      <input
+                        value={studentForm.guardianLastName}
+                        onChange={(event) =>
+                          updateStudentField(
+                            "guardianLastName",
+                            event.target.value
+                          )
+                        }
+                        placeholder="Veli soyadı"
+                        required
+                      />
+                    </label>
+
+                    <label>
+                      Telefon
+                      <input
+                        type="tel"
+                        value={studentForm.guardianPhone}
+                        onChange={(event) =>
+                          updateStudentField("guardianPhone", event.target.value)
+                        }
+                        placeholder="+49..."
+                      />
+                    </label>
+
+                    <label>
+                      WhatsApp numarası
+                      <input
+                        type="tel"
+                        value={studentForm.guardianWhatsapp}
+                        onChange={(event) =>
+                          updateStudentField(
+                            "guardianWhatsapp",
+                            event.target.value
+                          )
+                        }
+                        placeholder="+49..."
+                      />
+                    </label>
+
+                    <label className="fullWidth">
+                      E-posta
+                      <input
+                        type="email"
+                        value={studentForm.guardianEmail}
+                        onChange={(event) =>
+                          updateStudentField("guardianEmail", event.target.value)
+                        }
+                        placeholder="veli@email.com"
+                      />
+                    </label>
+                  </div>
+
+                  <label className="toggleRow">
+                    <input
+                      type="checkbox"
+                      checked={studentForm.secondGuardianEnabled}
+                      onChange={(event) =>
+                        updateStudentField(
+                          "secondGuardianEnabled",
+                          event.target.checked
+                        )
+                      }
+                    />
+                    <span>İkinci veli ekle</span>
+                  </label>
+
+                  {studentForm.secondGuardianEnabled ? (
+                    <div className="secondGuardianBox">
+                      <div className="secondGuardianHeader">
+                        <strong>İkinci veli</strong>
+                        <small>Opsiyonel iletişim bilgileri</small>
+                      </div>
+
+                      <div className="formGrid">
+                        <label>
+                          Ad *
+                          <input
+                            value={studentForm.secondGuardianFirstName}
+                            onChange={(event) =>
+                              updateStudentField(
+                                "secondGuardianFirstName",
+                                event.target.value
+                              )
+                            }
+                            placeholder="Ad"
+                            required
+                          />
+                        </label>
+
+                        <label>
+                          Soyad *
+                          <input
+                            value={studentForm.secondGuardianLastName}
+                            onChange={(event) =>
+                              updateStudentField(
+                                "secondGuardianLastName",
+                                event.target.value
+                              )
+                            }
+                            placeholder="Soyad"
+                            required
+                          />
+                        </label>
+
+                        <label>
+                          Telefon
+                          <input
+                            type="tel"
+                            value={studentForm.secondGuardianPhone}
+                            onChange={(event) =>
+                              updateStudentField(
+                                "secondGuardianPhone",
+                                event.target.value
+                              )
+                            }
+                            placeholder="+49..."
+                          />
+                        </label>
+
+                        <label>
+                          WhatsApp numarası
+                          <input
+                            type="tel"
+                            value={studentForm.secondGuardianWhatsapp}
+                            onChange={(event) =>
+                              updateStudentField(
+                                "secondGuardianWhatsapp",
+                                event.target.value
+                              )
+                            }
+                            placeholder="+49..."
+                          />
+                        </label>
+
+                        <label className="fullWidth">
+                          E-posta
+                          <input
+                            type="email"
+                            value={studentForm.secondGuardianEmail}
+                            onChange={(event) =>
+                              updateStudentField(
+                                "secondGuardianEmail",
+                                event.target.value
+                              )
+                            }
+                            placeholder="veli2@email.com"
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              )}
 
               {studentError ? (
                 <p className="formError">{studentError}</p>
               ) : null}
 
-              <div className="modalActions">
-                <button
-                  type="button"
-                  className="secondaryButton"
-                  onClick={closeStudentModal}
-                  disabled={studentSaving}
-                >
-                  Vazgeç
-                </button>
-                <button
-                  className="primaryButton"
-                  type="submit"
-                  disabled={studentSaving}
-                >
-                  {studentSaving ? "Kaydediliyor…" : "Öğrenciyi Kaydet"}
-                </button>
+              <div className="modalActions wizardActions">
+                {studentStep === 1 ? (
+                  <>
+                    <button
+                      type="button"
+                      className="secondaryButton"
+                      onClick={closeStudentModal}
+                    >
+                      Vazgeç
+                    </button>
+                    <button
+                      type="button"
+                      className="primaryButton"
+                      onClick={goToGuardianStep}
+                    >
+                      Devam Et →
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className="secondaryButton"
+                      onClick={() => {
+                        setStudentError("");
+                        setStudentStep(1);
+                      }}
+                      disabled={studentSaving}
+                    >
+                      ← Geri
+                    </button>
+                    <button
+                      className="primaryButton"
+                      type="submit"
+                      disabled={studentSaving}
+                    >
+                      {studentSaving ? "Kaydediliyor…" : "Öğrenciyi Kaydet"}
+                    </button>
+                  </>
+                )}
               </div>
             </form>
           </section>
