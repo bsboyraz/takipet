@@ -866,3 +866,70 @@ button {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+
+/* ===== Step 3: lesson scheduling ===== */
+
+.stepperThree {
+  grid-template-columns:
+    minmax(0, 1fr) 42px
+    minmax(0, 1fr) 42px
+    minmax(0, 1fr);
+}
+
+.formGrid select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: #fff;
+  color: var(--ink);
+  padding: 12px 13px;
+  outline: none;
+}
+
+.formGrid select:focus {
+  border-color: #f3b18d;
+  box-shadow: 0 0 0 4px rgba(244, 124, 60, 0.1);
+}
+
+.scheduleToggle {
+  padding: 13px 14px;
+  border-radius: 14px;
+  background: #fff7f2;
+  border: 1px solid #f5d7c6;
+}
+
+.scheduleSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 15px;
+  border-radius: 14px;
+  background: #f7f7f8;
+  border: 1px solid var(--line);
+}
+
+.scheduleSummary span {
+  color: var(--orange-dark);
+  font-weight: 800;
+}
+
+.scheduleSkip {
+  padding: 16px;
+  border: 1px dashed #d9d9de;
+  border-radius: 14px;
+  color: var(--muted);
+  background: #fafafa;
+  line-height: 1.5;
+}
+
+@media (max-width: 800px) {
+  .stepperThree {
+    grid-template-columns: 1fr;
+  }
+
+  .stepperThree .stepLine {
+    display: none;
+  }
+}
