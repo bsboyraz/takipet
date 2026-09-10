@@ -42,6 +42,15 @@ type StudentForm = {
   secondGuardianPhone: string;
   secondGuardianWhatsapp: string;
   secondGuardianEmail: string;
+
+  scheduleEnabled: boolean;
+  lessonDate: string;
+  lessonTime: string;
+  lessonDuration: string;
+  lessonType: "online" | "in_person";
+  weeklyRepeat: boolean;
+  repeatUntil: string;
+  meetingUrl: string;
 };
 
 const emptyStudentForm: StudentForm = {
@@ -66,6 +75,15 @@ const emptyStudentForm: StudentForm = {
   secondGuardianPhone: "",
   secondGuardianWhatsapp: "",
   secondGuardianEmail: "",
+
+  scheduleEnabled: true,
+  lessonDate: "",
+  lessonTime: "",
+  lessonDuration: "60",
+  lessonType: "online",
+  weeklyRepeat: false,
+  repeatUntil: "",
+  meetingUrl: "",
 };
 
 const roleLabels: Record<Profile["role"], string> = {
@@ -93,7 +111,7 @@ export default function Home() {
 
   const [quickMenuOpen, setQuickMenuOpen] = useState(false);
   const [studentModalOpen, setStudentModalOpen] = useState(false);
-  const [studentStep, setStudentStep] = useState<1 | 2>(1);
+  const [studentStep, setStudentStep] = useState<1 | 2 | 3>(1);
   const [studentForm, setStudentForm] =
     useState<StudentForm>(emptyStudentForm);
 
@@ -259,24 +277,14 @@ export default function Home() {
     setStudentStep(2);
   }
 
-  async function handleAddStudent(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (!profile || profile.role !== "teacher") {
-      setStudentError("Bu işlem için öğretmen hesabı gerekir.");
-      return;
-    }
-
-    if (!studentForm.firstName.trim() || !studentForm.lastName.trim()) {
-      setStudentError("Öğrencinin adı ve soyadı zorunludur.");
-      return;
-    }
+  function goToScheduleStep() {
+    setStudentError("");
 
     if (
       !studentForm.guardianFirstName.trim() ||
       !studentForm.guardianLastName.trim()
     ) {
-      setStudentError("Birinci velinin adı ve soyadı zorunludur.");
+      setStudentError("Devam etmek için birinci velinin adı ve soyadı zorunludur.");
       return;
     }
 
@@ -291,16 +299,141 @@ export default function Home() {
       return;
     }
 
+    setStudentStep(3);
+  }
+
+  function buildLessonRows(studentId: string, teacherId: string) {
+    if (!studentForm.scheduleEnabled) return [];
+
+    if (!studentForm.lessonDate || !studentForm.lessonTime) {
+      throw new Error("İlk ders tarihi ve saati zorunludur.");
+    }
+
+    const duration = Number(studentForm.lessonDuration || 60);
+    if (!Number.isFinite(duration) || duration <= 0) {
+      throw new Error("Ders süresi geçerli bir sayı olmalıdır.");
+    }
+
+    if (studentForm.weeklyRepeat && !studentForm.repeatUntil) {
+      throw new Error("Haftalık tekrar için bitiş tarihi seçmelisin.");
+    }
+
+    const firstStart = new Date(
+      `${studentForm.lessonDate}T${studentForm.lessonTime}:00`
+    );
+
+    if (Number.isNaN(firstStart.getTime())) {
+      throw new Error("Ders tarihi veya saati geçersiz.");
+    }
+
+    const lastDate = studentForm.weeklyRepeat
+      ? new Date(`${studentForm.repeatUntil}T23:59:59`)
+      : firstStart;
+
+    if (studentForm.weeklyRepeat && lastDate < firstStart) {
+      throw new Error("Tekrar bitiş tarihi ilk dersten önce olamaz.");
+    }
+
+    const recurrenceGroupId = studentForm.weeklyRepeat
+      ? crypto.randomUUID()
+      : null;
+
+    const rows = [];
+    const current = new Date(firstStart);
+    let safetyCounter = 0;
+
+    while (current <= lastDate && safetyCounter < 160) {
+      const end = new Date(current.getTime() + duration * 60_000);
+
+      rows.push({
+        teacher_id: teacherId,
+        student_id: studentId,
+        title: studentForm.subject.trim() || "Ders",
+        starts_at: current.toISOString(),
+        ends_at: end.toISOString(),
+        lesson_type: studentForm.lessonType,
+        status: "planned",
+        meeting_url:
+          studentForm.lessonType === "online"
+            ? studentForm.meetingUrl.trim() || null
+            : null,
+        fee: Number(studentForm.defaultLessonFee || 0),
+        recurrence_group_id: recurrenceGroupId,
+        recurrence_rule: studentForm.weeklyRepeat
+          ? `FREQ=WEEKLY;UNTIL=${studentForm.repeatUntil}`
+          : null,
+      });
+
+      if (!studentForm.weeklyRepeat) break;
+
+      current.setDate(current.getDate() + 7);
+      safetyCounter += 1;
+    }
+
+    return rows;
+  }
+
+  async function handleAddStudent(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!profile || profile.role !== "teacher") {
+      setStudentError("Bu işlem için öğretmen hesabı gerekir.");
+      return;
+    }
+
+    if (!studentForm.firstName.trim() || !studentForm.lastName.trim()) {
+      setStudentError("Öğrencinin adı ve soyadı zorunludur.");
+      setStudentStep(1);
+      return;
+    }
+
+    if (
+      !studentForm.guardianFirstName.trim() ||
+      !studentForm.guardianLastName.trim()
+    ) {
+      setStudentError("Birinci velinin adı ve soyadı zorunludur.");
+      setStudentStep(2);
+      return;
+    }
+
+    if (
+      studentForm.secondGuardianEnabled &&
+      (!studentForm.secondGuardianFirstName.trim() ||
+        !studentForm.secondGuardianLastName.trim())
+    ) {
+      setStudentError(
+        "İkinci veli açıksa ikinci velinin adı ve soyadı zorunludur."
+      );
+      setStudentStep(2);
+      return;
+    }
+
     const startingBalance = Number(studentForm.startingBalance || 0);
     const lessonFee = Number(studentForm.defaultLessonFee || 0);
 
     if (Number.isNaN(startingBalance) || Number.isNaN(lessonFee)) {
       setStudentError("Bakiye ve ders ücreti sayı olmalıdır.");
+      setStudentStep(1);
       return;
     }
 
     if (lessonFee < 0) {
       setStudentError("Ders ücreti negatif olamaz.");
+      setStudentStep(1);
+      return;
+    }
+
+    let lessonRows: Array<Record<string, unknown>> = [];
+
+    try {
+      lessonRows = buildLessonRows("TEMP", profile.id);
+    } catch (scheduleError) {
+      setStudentError(
+        scheduleError instanceof Error
+          ? scheduleError.message
+          : "Ders programı kontrol edilemedi."
+      );
+      setStudentStep(3);
       return;
     }
 
@@ -366,12 +499,28 @@ export default function Home() {
 
     if (guardianError) {
       await supabase.from("students").delete().eq("id", newStudent.id);
-
       setStudentError(
         `Veli bilgileri kaydedilemedi: ${guardianError.message}`
       );
       setStudentSaving(false);
       return;
+    }
+
+    if (studentForm.scheduleEnabled) {
+      lessonRows = buildLessonRows(newStudent.id, profile.id);
+
+      const { error: lessonError } = await supabase
+        .from("lessons")
+        .insert(lessonRows);
+
+      if (lessonError) {
+        await supabase.from("students").delete().eq("id", newStudent.id);
+        setStudentError(
+          `Ders programı kaydedilemedi: ${lessonError.message}`
+        );
+        setStudentSaving(false);
+        return;
+      }
     }
 
     await loadStudents(profile.id);
@@ -381,8 +530,13 @@ export default function Home() {
 
     setStudentSaving(false);
     setStudentModalOpen(false);
+    setStudentStep(1);
     setStudentForm(emptyStudentForm);
-    setSuccessMessage(`${savedStudentName} ve veli bilgileri başarıyla eklendi.`);
+    setSuccessMessage(
+      studentForm.scheduleEnabled
+        ? `${savedStudentName}, veli bilgileri ve ders programı başarıyla eklendi.`
+        : `${savedStudentName} ve veli bilgileri başarıyla eklendi.`
+    );
 
     window.setTimeout(() => {
       setSuccessMessage("");
@@ -631,10 +785,10 @@ export default function Home() {
             </div>
 
             <form className="studentForm" onSubmit={handleAddStudent}>
-              <div className="stepper">
+              <div className="stepper stepperThree">
                 <button
                   type="button"
-                  className={`stepItem ${studentStep === 1 ? "active" : "done"}`}
+                  className={`stepItem ${studentStep === 1 ? "active" : studentStep > 1 ? "done" : ""}`}
                   onClick={() => setStudentStep(1)}
                 >
                   <span>1</span>
@@ -648,10 +802,10 @@ export default function Home() {
 
                 <button
                   type="button"
-                  className={`stepItem ${studentStep === 2 ? "active" : ""}`}
+                  className={`stepItem ${studentStep === 2 ? "active" : studentStep > 2 ? "done" : ""}`}
                   onClick={() => {
-                    if (studentStep === 2) return;
-                    goToGuardianStep();
+                    if (studentStep === 1) goToGuardianStep();
+                    else setStudentStep(2);
                   }}
                 >
                   <span>2</span>
@@ -660,14 +814,34 @@ export default function Home() {
                     <small>İletişim ve WhatsApp</small>
                   </div>
                 </button>
+
+                <div className="stepLine" />
+
+                <button
+                  type="button"
+                  className={`stepItem ${studentStep === 3 ? "active" : ""}`}
+                  onClick={() => {
+                    if (studentStep === 1) {
+                      goToGuardianStep();
+                      return;
+                    }
+                    goToScheduleStep();
+                  }}
+                >
+                  <span>3</span>
+                  <div>
+                    <strong>Ders programı</strong>
+                    <small>Tarih, saat ve tekrar</small>
+                  </div>
+                </button>
               </div>
 
               {studentStep === 1 ? (
                 <div className="stepPanel">
                   <div className="stepPanelHeader">
-                    <span className="eyebrow">ADIM 1 / 2</span>
+                    <span className="eyebrow">ADIM 1 / 3</span>
                     <h3>Öğrenci bilgileri</h3>
-                    <p>Öğrencinin temel bilgilerini ve ders ücretini gir.</p>
+                    <p>Öğrencinin temel bilgilerini ve ücretini gir.</p>
                   </div>
 
                   <div className="formGrid">
@@ -772,10 +946,10 @@ export default function Home() {
                     </label>
                   </div>
                 </div>
-              ) : (
+              ) : studentStep === 2 ? (
                 <div className="stepPanel">
                   <div className="stepPanelHeader">
-                    <span className="eyebrow">ADIM 2 / 2</span>
+                    <span className="eyebrow">ADIM 2 / 3</span>
                     <h3>Veli ve iletişim</h3>
                     <p>Veli iletişim bilgilerini ve WhatsApp numarasını ekle.</p>
                   </div>
@@ -951,6 +1125,151 @@ export default function Home() {
                     </div>
                   ) : null}
                 </div>
+              ) : (
+                <div className="stepPanel">
+                  <div className="stepPanelHeader">
+                    <span className="eyebrow">ADIM 3 / 3</span>
+                    <h3>Ders programı</h3>
+                    <p>İlk dersi planla; istersen haftalık olarak otomatik tekrarla.</p>
+                  </div>
+
+                  <label className="toggleRow scheduleToggle">
+                    <input
+                      type="checkbox"
+                      checked={studentForm.scheduleEnabled}
+                      onChange={(event) =>
+                        updateStudentField(
+                          "scheduleEnabled",
+                          event.target.checked
+                        )
+                      }
+                    />
+                    <span>Ders programını şimdi ekle</span>
+                  </label>
+
+                  {studentForm.scheduleEnabled ? (
+                    <div className="formGrid">
+                      <label>
+                        İlk ders tarihi *
+                        <input
+                          type="date"
+                          value={studentForm.lessonDate}
+                          onChange={(event) =>
+                            updateStudentField("lessonDate", event.target.value)
+                          }
+                          required
+                        />
+                      </label>
+
+                      <label>
+                        Başlangıç saati *
+                        <input
+                          type="time"
+                          value={studentForm.lessonTime}
+                          onChange={(event) =>
+                            updateStudentField("lessonTime", event.target.value)
+                          }
+                          required
+                        />
+                      </label>
+
+                      <label>
+                        Ders süresi
+                        <select
+                          value={studentForm.lessonDuration}
+                          onChange={(event) =>
+                            updateStudentField(
+                              "lessonDuration",
+                              event.target.value
+                            )
+                          }
+                        >
+                          <option value="30">30 dakika</option>
+                          <option value="45">45 dakika</option>
+                          <option value="60">60 dakika</option>
+                          <option value="90">90 dakika</option>
+                          <option value="120">120 dakika</option>
+                        </select>
+                      </label>
+
+                      <label>
+                        Ders tipi
+                        <select
+                          value={studentForm.lessonType}
+                          onChange={(event) =>
+                            updateStudentField(
+                              "lessonType",
+                              event.target.value as "online" | "in_person"
+                            )
+                          }
+                        >
+                          <option value="online">Online</option>
+                          <option value="in_person">Yüz yüze</option>
+                        </select>
+                      </label>
+
+                      {studentForm.lessonType === "online" ? (
+                        <label className="fullWidth">
+                          Ders bağlantısı
+                          <input
+                            type="url"
+                            value={studentForm.meetingUrl}
+                            onChange={(event) =>
+                              updateStudentField(
+                                "meetingUrl",
+                                event.target.value
+                              )
+                            }
+                            placeholder="https://meet.google.com/... veya Zoom linki"
+                          />
+                        </label>
+                      ) : null}
+
+                      <label className="toggleRow fullWidth">
+                        <input
+                          type="checkbox"
+                          checked={studentForm.weeklyRepeat}
+                          onChange={(event) =>
+                            updateStudentField(
+                              "weeklyRepeat",
+                              event.target.checked
+                            )
+                          }
+                        />
+                        <span>Her hafta aynı gün ve saatte tekrar et</span>
+                      </label>
+
+                      {studentForm.weeklyRepeat ? (
+                        <label className="fullWidth">
+                          Tekrar bitiş tarihi *
+                          <input
+                            type="date"
+                            value={studentForm.repeatUntil}
+                            onChange={(event) =>
+                              updateStudentField(
+                                "repeatUntil",
+                                event.target.value
+                              )
+                            }
+                            required
+                          />
+                        </label>
+                      ) : null}
+
+                      <div className="scheduleSummary fullWidth">
+                        <strong>Ders ücreti</strong>
+                        <span>
+                          {Number(studentForm.defaultLessonFee || 0).toFixed(2)} € / ders
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="scheduleSkip">
+                      Öğrenciyi şimdi kaydedip ders programını daha sonra
+                      ekleyebilirsin.
+                    </div>
+                  )}
+                </div>
               )}
 
               {studentError ? (
@@ -975,7 +1294,7 @@ export default function Home() {
                       Devam Et →
                     </button>
                   </>
-                ) : (
+                ) : studentStep === 2 ? (
                   <>
                     <button
                       type="button"
@@ -983,6 +1302,26 @@ export default function Home() {
                       onClick={() => {
                         setStudentError("");
                         setStudentStep(1);
+                      }}
+                    >
+                      ← Geri
+                    </button>
+                    <button
+                      type="button"
+                      className="primaryButton"
+                      onClick={goToScheduleStep}
+                    >
+                      Devam Et →
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className="secondaryButton"
+                      onClick={() => {
+                        setStudentError("");
+                        setStudentStep(2);
                       }}
                       disabled={studentSaving}
                     >
