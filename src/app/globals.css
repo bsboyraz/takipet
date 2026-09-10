@@ -23,8 +23,121 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-button {
+button,
+input {
   font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.authShell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(244,124,60,.10), transparent 28%),
+    radial-gradient(circle at 85% 80%, rgba(70,150,120,.09), transparent 26%),
+    var(--bg);
+}
+
+.loginCard,
+.loadingCard {
+  width: min(100%, 460px);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 26px;
+  padding: 28px;
+  box-shadow: 0 24px 60px rgba(25, 30, 40, 0.08);
+}
+
+.loginBrand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 30px;
+}
+
+.loginBrand strong {
+  font-size: 22px;
+}
+
+.loginBrand p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.loginIntro h1 {
+  margin: 8px 0 10px;
+  font-size: 34px;
+  letter-spacing: -0.035em;
+}
+
+.loginIntro p {
+  margin: 0 0 24px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.loginForm {
+  display: grid;
+  gap: 16px;
+}
+
+.loginForm label {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.loginForm input {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 14px;
+  padding: 13px 14px;
+  outline: none;
+  color: var(--ink);
+}
+
+.loginForm input:focus {
+  border-color: #f3b18d;
+  box-shadow: 0 0 0 4px rgba(244, 124, 60, 0.10);
+}
+
+.loginButton {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.loginButton:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.formError {
+  margin: 0;
+  padding: 11px 12px;
+  border-radius: 12px;
+  background: #fff0f0;
+  color: #b84242;
+  font-size: 13px;
+}
+
+.loginFootnote {
+  margin: 18px 0 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.loadingCard {
+  text-align: center;
+  color: var(--muted);
 }
 
 .shell {
@@ -38,6 +151,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
 }
 
 .brand {
@@ -79,13 +193,24 @@ button {
   bottom: 5px;
 }
 
+.profileArea {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .profileButton,
-.segmented button {
+.segmented button,
+.logoutButton {
   border: 1px solid var(--line);
   background: var(--surface);
   border-radius: 12px;
   padding: 10px 14px;
   color: var(--ink);
+}
+
+.logoutButton {
+  color: var(--muted);
 }
 
 .hero {
@@ -130,7 +255,6 @@ button {
   background: var(--orange);
   color: #fff;
   font-weight: 700;
-  cursor: pointer;
   box-shadow: 0 10px 24px rgba(244, 124, 60, 0.22);
 }
 
@@ -257,6 +381,11 @@ button {
   .primaryButton {
     width: 100%;
   }
+
+  .profileArea {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
 }
 
 @media (max-width: 520px) {
@@ -286,5 +415,10 @@ button {
     align-items: flex-start;
     gap: 12px;
     flex-direction: column;
+  }
+
+  .loginCard {
+    padding: 22px;
+    border-radius: 22px;
   }
 }
