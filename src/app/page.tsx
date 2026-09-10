@@ -57,6 +57,43 @@ function addDays(date: Date, amount: number) {
   return result;
 }
 
+
+function addMonths(date: Date, amount: number) {
+  const result = new Date(date);
+  result.setMonth(result.getMonth() + amount);
+  return result;
+}
+
+function startOfMonth(date: Date) {
+  const result = new Date(date.getFullYear(), date.getMonth(), 1);
+  result.setHours(0, 0, 0, 0);
+  return result;
+}
+
+function endOfMonth(date: Date) {
+  const result = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  result.setHours(23, 59, 59, 999);
+  return result;
+}
+
+function endOfWeek(date: Date) {
+  const result = startOfWeek(date);
+  result.setDate(result.getDate() + 6);
+  result.setHours(23, 59, 59, 999);
+  return result;
+}
+
+function sameLocalMonth(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
+}
+
+function formatTimeLabel(value: string) {
+  return new Date(value).toLocaleTimeString('tr-TR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 function sameLocalDay(a: Date, b: Date) {
   return (
     a.getFullYear() === b.getFullYear() &&
@@ -194,8 +231,8 @@ export default function Home() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
-  const [weekOffset, setWeekOffset] = useState(0);
-  const [currentWeekLessonCount, setCurrentWeekLessonCount] = useState(0);
+  const [monthOffset, setMonthOffset] = useState(0);
+  const [currentMonthLessonCount, setCurrentMonthLessonCount] = useState(0);
   const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
   const [deletingStudent, setDeletingStudent] = useState(false);
   const [studentPanelOpen, setStudentPanelOpen] = useState(false);
@@ -214,14 +251,23 @@ export default function Home() {
   const [studentForm, setStudentForm] =
     useState<StudentForm>(emptyStudentForm);
 
-  const visibleWeekStart = useMemo(() => {
-    const monday = startOfWeek(new Date());
-    return addDays(monday, weekOffset * 7);
-  }, [weekOffset]);
+  const visibleMonthDate = useMemo(() => {
+    return addMonths(startOfMonth(new Date()), monthOffset);
+  }, [monthOffset]);
 
-  const visibleWeekDays = useMemo(
-    () => Array.from({ length: 7 }, (_, index) => addDays(visibleWeekStart, index)),
-    [visibleWeekStart]
+  const visibleMonthStart = useMemo(
+    () => startOfMonth(visibleMonthDate),
+    [visibleMonthDate]
+  );
+
+  const visibleMonthGridStart = useMemo(
+    () => startOfWeek(visibleMonthStart),
+    [visibleMonthStart]
+  );
+
+  const visibleMonthDays = useMemo(
+    () => Array.from({ length: 42 }, (_, index) => addDays(visibleMonthGridStart, index)),
+    [visibleMonthGridStart]
   );
 
   useEffect(() => {
@@ -273,9 +319,9 @@ export default function Home() {
 
   useEffect(() => {
     if (!profile || profile.role !== "teacher") return;
-    loadLessons(profile.id, weekOffset);
+    loadLessons(profile.id, monthOffset);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.id, profile?.role, weekOffset]);
+  }, [profile?.id, profile?.role, monthOffset]);
 
   async function loadStudents(teacherId: string) {
     const { data, error: studentsError } = await supabase
@@ -294,10 +340,10 @@ export default function Home() {
     setStudents((data ?? []) as Student[]);
   }
 
-  async function loadLessons(teacherId: string, offset = weekOffset) {
-    const monday = startOfWeek(new Date());
-    const rangeStart = addDays(monday, offset * 7);
-    const rangeEnd = addDays(rangeStart, 7);
+  async function loadLessons(teacherId: string, offset = monthOffset) {
+    const targetMonth = addMonths(startOfMonth(new Date()), offset);
+    const rangeStart = startOfWeek(startOfMonth(targetMonth));
+    const rangeEnd = addDays(endOfWeek(endOfMonth(targetMonth)), 1);
 
     const { data, error: lessonsError } = await supabase
       .from("lessons")
@@ -316,10 +362,11 @@ export default function Home() {
 
     const loadedLessons = (data ?? []) as Lesson[];
     setLessons(loadedLessons);
-
-    if (offset === 0) {
-      setCurrentWeekLessonCount(loadedLessons.length);
-    }
+    setCurrentMonthLessonCount(
+      loadedLessons.filter((lesson) =>
+        sameLocalMonth(new Date(lesson.starts_at), targetMonth)
+      ).length
+    );
   }
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
@@ -368,8 +415,8 @@ export default function Home() {
     setProfile(null);
     setStudents([]);
     setLessons([]);
-    setWeekOffset(0);
-    setCurrentWeekLessonCount(0);
+    setMonthOffset(0);
+    setCurrentMonthLessonCount(0);
     setEmail("");
     setPassword("");
   }
@@ -399,7 +446,7 @@ export default function Home() {
     setDeletingStudent(false);
     await Promise.all([
       loadStudents(profile.id),
-      loadLessons(profile.id, weekOffset),
+      loadLessons(profile.id, monthOffset),
     ]);
 
     setSuccessMessage(`${deletedName} ve bağlı kayıtları silindi.`);
@@ -706,7 +753,7 @@ export default function Home() {
 
     await Promise.all([
       loadStudents(profile.id),
-      loadLessons(profile.id, weekOffset),
+      loadLessons(profile.id, monthOffset),
     ]);
 
     const savedStudentName =
@@ -807,227 +854,186 @@ export default function Home() {
   const teacherDashboard = profile.role === "teacher";
 
   return (
-    <main className="calendarApp">
-      <aside className="calendarSidebar">
-        <div className="sidebarBrand" title="Takipet">
-          <div className="sidebarLogo">
-            <span>▱</span>
-            <b>✎</b>
+    <main className="plannerApp">
+      <aside className="plannerSidebar">
+        <div className="plannerBrand">
+          <div className="plannerBrandMark" aria-hidden="true">
+            <span className="paper">▱</span>
+            <span className="pen">✎</span>
+          </div>
+          <div>
+            <strong>Takipet</strong>
+            <p>Özel ders yönetimi</p>
           </div>
         </div>
 
-        <nav className="sidebarNav" aria-label="Ana menü">
-          <button className="sidebarButton active" type="button" title="Takvim">
-            <span>▣</span>
+        <div className="sidebarBlock">
+          <span className="sidebarBlockTitle">ANA MENÜ</span>
+          <button className="sidebarListItem active" type="button">
+            <span>🗓</span>
+            <b>Takvim</b>
           </button>
           <button
-            className="sidebarButton"
+            className="sidebarListItem"
             type="button"
-            title="Öğrenciler"
             onClick={() => setStudentPanelOpen(true)}
           >
-            <span>♟</span>
+            <span>👥</span>
+            <b>Öğrenciler</b>
           </button>
-          <button className="sidebarButton" type="button" title="Ödevler" disabled>
-            <span>◆</span>
+          <button className="sidebarListItem" type="button" disabled>
+            <span>📚</span>
+            <b>Dersler</b>
           </button>
-          <button className="sidebarButton" type="button" title="Ödemeler" disabled>
-            <span>€</span>
+          <button className="sidebarListItem" type="button" disabled>
+            <span>📝</span>
+            <b>Ödevler</b>
           </button>
-          <button className="sidebarButton" type="button" title="Testler" disabled>
-            <span>✓</span>
+          <button className="sidebarListItem" type="button" disabled>
+            <span>💳</span>
+            <b>Ödemeler</b>
           </button>
-        </nav>
+          <button className="sidebarListItem" type="button" disabled>
+            <span>✅</span>
+            <b>Testler</b>
+          </button>
+        </div>
 
-        <div className="sidebarBottom">
-          <button className="sidebarButton" type="button" title="Ayarlar" disabled>
-            <span>⚙</span>
+        <div className="sidebarBlock sidebarMeta">
+          <span className="sidebarBlockTitle">ÖZET</span>
+          <div className="sidebarStat">
+            <strong>{students.length}</strong>
+            <span>aktif öğrenci</span>
+          </div>
+          <div className="sidebarStat">
+            <strong>{currentMonthLessonCount}</strong>
+            <span>bu ay planlanan ders</span>
+          </div>
+        </div>
+
+        <div className="sidebarFooter">
+          <div className="sidebarUser">
+            <small>{roleLabels[profile.role]}</small>
+            <strong>{displayName || roleLabels[profile.role]}</strong>
+          </div>
+          <button type="button" className="sidebarLogout" onClick={handleLogout}>
+            Çıkış
           </button>
         </div>
       </aside>
 
-      <section className="calendarWorkspace">
-        <header className="calendarToolbar">
-          <div className="calendarTitleArea">
-            <div className="monthNavigator">
+      <section className="plannerWorkspace">
+        <header className="plannerTopbar">
+          <div className="plannerTopbarLeft">
+            <h1>
+              {visibleMonthDate.toLocaleDateString("tr-TR", {
+                month: "long",
+                year: "numeric",
+              })}
+            </h1>
+            <p>
+              Tüm ekran takvim görünümü · {students.length} öğrenci · {currentMonthLessonCount} ders
+            </p>
+          </div>
+
+          <div className="plannerTopbarRight">
+            <div className="viewSwitchPill">
+              <button type="button" disabled>Gün</button>
+              <button type="button" disabled>Hafta</button>
+              <button type="button" className="active">Ay</button>
+              <button type="button" disabled>Yıl</button>
+            </div>
+
+            <div className="plannerNavButtons">
               <button
                 type="button"
-                onClick={() => setWeekOffset((value) => value - 1)}
-                aria-label="Önceki hafta"
+                onClick={() => setMonthOffset((value) => value - 1)}
+                aria-label="Önceki ay"
               >
                 ‹
               </button>
-
-              <div>
-                <h1>
-                  {visibleWeekStart.toLocaleDateString("tr-TR", {
-                    month: "long",
-                    year: "numeric",
-                  })}
-                </h1>
-                <p>
-                  {visibleWeekStart.toLocaleDateString("tr-TR", {
-                    day: "2-digit",
-                    month: "short",
-                  })}
-                  {" – "}
-                  {addDays(visibleWeekStart, 6).toLocaleDateString("tr-TR", {
-                    day: "2-digit",
-                    month: "short",
-                  })}
-                  {" · "}
-                  {students.length} öğrenci · {currentWeekLessonCount} ders
-                </p>
-              </div>
-
               <button
                 type="button"
-                onClick={() => setWeekOffset((value) => value + 1)}
-                aria-label="Sonraki hafta"
+                className="todayGhostButton"
+                onClick={() => setMonthOffset(0)}
+              >
+                Bugün
+              </button>
+              <button
+                type="button"
+                onClick={() => setMonthOffset((value) => value + 1)}
+                aria-label="Sonraki ay"
               >
                 ›
-              </button>
-            </div>
-          </div>
-
-          <div className="calendarToolbarActions">
-            <button
-              type="button"
-              className="todayCompactButton"
-              onClick={() => setWeekOffset(0)}
-            >
-              Bugün
-            </button>
-
-            <div className="calendarViewSwitch">
-              <button className="active" type="button">
-                Hafta
-              </button>
-              <button type="button" disabled>
-                Gün
-              </button>
-              <button type="button" disabled>
-                Rutin
-              </button>
-            </div>
-
-            <div className="calendarProfile">
-              <span>{displayName || roleLabels[profile.role]}</span>
-              <button type="button" onClick={handleLogout} title="Çıkış">
-                ↗
               </button>
             </div>
           </div>
         </header>
 
         {successMessage ? (
-          <div className="successToast calendarToast">{successMessage}</div>
+          <div className="successToast plannerToast">{successMessage}</div>
         ) : null}
 
         {error ? <div className="calendarError">{error}</div> : null}
 
-        <section className="scheduleSurface">
-          <div className="scheduleScroll">
-            <div className="scheduleCanvas">
-              <div className="scheduleHeader">
-                <div className="timeHeaderCell" />
-                {visibleWeekDays.map((day) => {
-                  const isToday = sameLocalDay(day, new Date());
+        <section className="monthPlannerSurface">
+          <div className="monthWeekdayRow">
+            {["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"].map((label) => (
+              <div className="monthWeekdayCell" key={label}>
+                {label}
+              </div>
+            ))}
+          </div>
 
-                  return (
-                    <div
-                      className={`scheduleDayHeader ${isToday ? "today" : ""}`}
-                      key={`header-${day.toISOString()}`}
-                    >
-                      <span>
-                        {day
-                          .toLocaleDateString("tr-TR", { weekday: "short" })
-                          .replace(".", "")
-                          .toUpperCase()}
+          <div className="monthGrid">
+            {visibleMonthDays.map((day) => {
+              const dayLessons = lessons.filter((lesson) =>
+                sameLocalDay(new Date(lesson.starts_at), day)
+              );
+              const isToday = sameLocalDay(day, new Date());
+              const isCurrentMonth = sameLocalMonth(day, visibleMonthDate);
+
+              return (
+                <article
+                  className={`monthCell ${isToday ? "today" : ""} ${
+                    isCurrentMonth ? "" : "outside"
+                  }`}
+                  key={day.toISOString()}
+                >
+                  <div className="monthCellHeader">
+                    <strong className="monthDayNumber">{day.getDate()}</strong>
+                    {!isCurrentMonth ? (
+                      <span className="monthCellMonthHint">
+                        {day.toLocaleDateString("tr-TR", { month: "short" })}
                       </span>
-                      <strong>{day.getDate()}</strong>
-                    </div>
-                  );
-                })}
-              </div>
+                    ) : null}
+                  </div>
 
-              <div className="scheduleBody">
-                <div className="timeScale">
-                  {Array.from(
-                    { length: CALENDAR_END_HOUR - CALENDAR_START_HOUR + 1 },
-                    (_, index) => CALENDAR_START_HOUR + index
-                  ).map((hour) => (
-                    <div className="timeTick" key={hour}>
-                      {String(hour).padStart(2, "0")}:00
-                    </div>
-                  ))}
-                </div>
+                  <div className="monthEventList">
+                    {dayLessons.length === 0 ? (
+                      <div className="monthEventSpacer" />
+                    ) : null}
 
-                {visibleWeekDays.map((day) => {
-                  const dayLessons = lessons.filter((lesson) =>
-                    sameLocalDay(new Date(lesson.starts_at), day)
-                  );
-                  const isToday = sameLocalDay(day, new Date());
+                    {dayLessons.slice(0, 4).map((lesson) => (
+                      <div
+                        className={`monthEventChip tone-${lessonTone(lesson)}`}
+                        key={lesson.id}
+                        title={`${studentNameFromLesson(lesson)} · ${lesson.title}`}
+                      >
+                        <strong>{studentNameFromLesson(lesson)}</strong>
+                        <span>
+                          {formatTimeLabel(lesson.starts_at)} · {lesson.title}
+                        </span>
+                      </div>
+                    ))}
 
-                  return (
-                    <div
-                      className={`scheduleDay ${isToday ? "today" : ""}`}
-                      key={`body-${day.toISOString()}`}
-                    >
-                      {Array.from(
-                        { length: CALENDAR_END_HOUR - CALENDAR_START_HOUR },
-                        (_, index) => (
-                          <div className="hourLine" key={index} />
-                        )
-                      )}
-
-                      {dayLessons.map((lesson) => {
-                        const start = new Date(lesson.starts_at);
-                        const end = new Date(lesson.ends_at);
-                        const position = lessonPosition(lesson);
-
-                        return (
-                          <article
-                            className={`timeLessonCard tone-${lessonTone(lesson)}`}
-                            style={position}
-                            key={lesson.id}
-                            title={`${studentNameFromLesson(lesson)} · ${lesson.title}`}
-                          >
-                            <div className="timeLessonMain">
-                              <strong>{studentNameFromLesson(lesson)}</strong>
-                              <span>{lesson.title}</span>
-                            </div>
-
-                            <small>
-                              {start.toLocaleTimeString("tr-TR", {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
-                              {" – "}
-                              {end.toLocaleTimeString("tr-TR", {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
-                            </small>
-
-                            {lesson.lesson_type === "online" &&
-                            lesson.meeting_url ? (
-                              <a
-                                href={lesson.meeting_url}
-                                target="_blank"
-                                rel="noreferrer"
-                              >
-                                Katıl ↗
-                              </a>
-                            ) : null}
-                          </article>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+                    {dayLessons.length > 4 ? (
+                      <div className="monthMoreEvents">+{dayLessons.length - 4} daha</div>
+                    ) : null}
+                  </div>
+                </article>
+              );
+            })}
           </div>
         </section>
 
@@ -1084,9 +1090,7 @@ export default function Home() {
             </div>
 
             {students.length === 0 ? (
-              <div className="drawerEmpty">
-                Henüz öğrenci eklenmedi.
-              </div>
+              <div className="drawerEmpty">Henüz öğrenci eklenmedi.</div>
             ) : (
               <div className="studentList drawerStudentList">
                 {students.map((student) => (
