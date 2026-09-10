@@ -656,3 +656,73 @@ button {
     right: auto;
   }
 }
+
+
+/* ===== Guardian fields ===== */
+
+.formSection {
+  display: grid;
+  gap: 15px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
+}
+
+.formSectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding-bottom: 2px;
+}
+
+.formSectionTitle > span {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: #fff1e8;
+  color: var(--orange-dark);
+  font-weight: 800;
+}
+
+.formSectionTitle strong,
+.formSectionTitle small {
+  display: block;
+}
+
+.formSectionTitle strong {
+  font-size: 15px;
+}
+
+.formSectionTitle small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.toggleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.toggleRow input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--orange);
+}
+
+.secondGuardianBox {
+  padding: 15px;
+  border-radius: 15px;
+  background: #fafafa;
+  border: 1px dashed #dedede;
+}
