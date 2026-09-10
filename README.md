@@ -21,3 +21,4 @@ npm run dev
 Ardından `.env.local` dosyasına Supabase Project URL ve **publishable** key değerlerini ekleyin.
 
 > `service_role` veya `sb_secret_...` anahtarlarını hiçbir zaman frontend'e ya da GitHub'a koymayın.
+Vercel deployment initialized.
