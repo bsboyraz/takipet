@@ -75,6 +75,44 @@ function studentNameFromLesson(lesson: Lesson) {
   return `${relation.first_name} ${relation.last_name}`.trim();
 }
 
+
+const CALENDAR_START_HOUR = 8;
+const CALENDAR_END_HOUR = 21;
+const CALENDAR_HOUR_HEIGHT = 64;
+
+function lessonPosition(lesson: Lesson) {
+  const start = new Date(lesson.starts_at);
+  const end = new Date(lesson.ends_at);
+
+  const startMinutes = start.getHours() * 60 + start.getMinutes();
+  const endMinutes = end.getHours() * 60 + end.getMinutes();
+  const calendarStartMinutes = CALENDAR_START_HOUR * 60;
+
+  const top =
+    ((startMinutes - calendarStartMinutes) / 60) * CALENDAR_HOUR_HEIGHT;
+  const rawHeight =
+    ((endMinutes - startMinutes) / 60) * CALENDAR_HOUR_HEIGHT;
+
+  return {
+    top: `${Math.max(0, top)}px`,
+    height: `${Math.max(34, rawHeight)}px`,
+  };
+}
+
+function lessonTone(lesson: Lesson) {
+  if (lesson.status === "completed") return "green";
+  if (lesson.status === "cancelled") return "gray";
+  if (lesson.status === "no_show") return "red";
+
+  const tones = ["orange", "green", "blue", "mint"];
+  const seed = Array.from(lesson.student_id).reduce(
+    (total, char) => total + char.charCodeAt(0),
+    0
+  );
+
+  return tones[seed % tones.length];
+}
+
 type StudentForm = {
   firstName: string;
   lastName: string;
@@ -160,6 +198,7 @@ export default function Home() {
   const [currentWeekLessonCount, setCurrentWeekLessonCount] = useState(0);
   const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
   const [deletingStudent, setDeletingStudent] = useState(false);
+  const [studentPanelOpen, setStudentPanelOpen] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -768,166 +807,198 @@ export default function Home() {
   const teacherDashboard = profile.role === "teacher";
 
   return (
-    <main className="shell">
-      <header className="topbar">
-        <div className="brand">
-          <div className="brandMark" aria-hidden="true">
-            <span className="paper">▱</span>
-            <span className="pen">✎</span>
-          </div>
-          <div>
-            <strong>Takipet</strong>
-            <p>Özel ders yönetimi</p>
+    <main className="calendarApp">
+      <aside className="calendarSidebar">
+        <div className="sidebarBrand" title="Takipet">
+          <div className="sidebarLogo">
+            <span>▱</span>
+            <b>✎</b>
           </div>
         </div>
 
-        <div className="profileArea">
-          <span className="profileButton">
-            {displayName || roleLabels[profile.role]} · {roleLabels[profile.role]}
-          </span>
-          <button className="logoutButton" onClick={handleLogout}>
-            Çıkış
+        <nav className="sidebarNav" aria-label="Ana menü">
+          <button className="sidebarButton active" type="button" title="Takvim">
+            <span>▣</span>
+          </button>
+          <button
+            className="sidebarButton"
+            type="button"
+            title="Öğrenciler"
+            onClick={() => setStudentPanelOpen(true)}
+          >
+            <span>♟</span>
+          </button>
+          <button className="sidebarButton" type="button" title="Ödevler" disabled>
+            <span>◆</span>
+          </button>
+          <button className="sidebarButton" type="button" title="Ödemeler" disabled>
+            <span>€</span>
+          </button>
+          <button className="sidebarButton" type="button" title="Testler" disabled>
+            <span>✓</span>
+          </button>
+        </nav>
+
+        <div className="sidebarBottom">
+          <button className="sidebarButton" type="button" title="Ayarlar" disabled>
+            <span>⚙</span>
           </button>
         </div>
-      </header>
+      </aside>
 
-      {successMessage ? (
-        <div className="successToast">{successMessage}</div>
-      ) : null}
+      <section className="calendarWorkspace">
+        <header className="calendarToolbar">
+          <div className="calendarTitleArea">
+            <div className="monthNavigator">
+              <button
+                type="button"
+                onClick={() => setWeekOffset((value) => value - 1)}
+                aria-label="Önceki hafta"
+              >
+                ‹
+              </button>
 
-      <section className="hero">
-        <div>
-          <span className="eyebrow">
-            {teacherDashboard ? "ÖĞRETMEN PANELİ" : "TAKİPET"}
-          </span>
-          <h1>Derslerini tek yerden takip et.</h1>
-          <p>
-            Öğrenci, veli, takvim, ödev, test ve ödeme yönetimi için Takipet
-            artık Supabase hesabınla bağlı çalışıyor.
-          </p>
-        </div>
-
-        {teacherDashboard ? (
-          <div className="quickActionWrap">
-            <button
-              className="primaryButton"
-              onClick={() => setQuickMenuOpen((current) => !current)}
-              aria-expanded={quickMenuOpen}
-            >
-              + Yeni işlem
-            </button>
-
-            {quickMenuOpen ? (
-              <div className="quickMenu">
-                <button onClick={openStudentModal}>👤 Öğrenci Ekle</button>
-                <button disabled>📅 Ders Ekle</button>
-                <button disabled>🏖️ Tatil Ekle</button>
-                <button disabled>💳 Ödeme Al</button>
-                <button disabled>📝 Ödev Ver</button>
-                <button disabled>✅ Test Oluştur</button>
+              <div>
+                <h1>
+                  {visibleWeekStart.toLocaleDateString("tr-TR", {
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </h1>
+                <p>
+                  {visibleWeekStart.toLocaleDateString("tr-TR", {
+                    day: "2-digit",
+                    month: "short",
+                  })}
+                  {" – "}
+                  {addDays(visibleWeekStart, 6).toLocaleDateString("tr-TR", {
+                    day: "2-digit",
+                    month: "short",
+                  })}
+                  {" · "}
+                  {students.length} öğrenci · {currentWeekLessonCount} ders
+                </p>
               </div>
-            ) : null}
-          </div>
-        ) : null}
-      </section>
 
-      <section className="statsGrid">
-        <article className="statCard">
-          <span>Toplam öğrenci</span>
-          <strong>{students.length}</strong>
-        </article>
-        <article className="statCard">
-          <span>Bu hafta ders</span>
-          <strong>{currentWeekLessonCount}</strong>
-        </article>
-        <article className="statCard">
-          <span>Bekleyen ödev</span>
-          <strong>0</strong>
-        </article>
-        <article className="statCard">
-          <span>Yaklaşan test</span>
-          <strong>0</strong>
-        </article>
-      </section>
-
-      <section className="weekCalendarCard">
-        <div className="calendarTop">
-          <div>
-            <span className="eyebrow">TAKVİM</span>
-            <h2>
-              {visibleWeekStart.toLocaleDateString("tr-TR", {
-                day: "2-digit",
-                month: "short",
-              })}
-              {" – "}
-              {addDays(visibleWeekStart, 6).toLocaleDateString("tr-TR", {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-              })}
-            </h2>
+              <button
+                type="button"
+                onClick={() => setWeekOffset((value) => value + 1)}
+                aria-label="Sonraki hafta"
+              >
+                ›
+              </button>
+            </div>
           </div>
 
-          <div className="calendarNav">
+          <div className="calendarToolbarActions">
             <button
               type="button"
-              className="calendarNavButton"
-              onClick={() => setWeekOffset((value) => value - 1)}
-              aria-label="Önceki hafta"
-            >
-              ←
-            </button>
-            <button
-              type="button"
-              className="calendarTodayButton"
+              className="todayCompactButton"
               onClick={() => setWeekOffset(0)}
             >
               Bugün
             </button>
-            <button
-              type="button"
-              className="calendarNavButton"
-              onClick={() => setWeekOffset((value) => value + 1)}
-              aria-label="Sonraki hafta"
-            >
-              →
-            </button>
+
+            <div className="calendarViewSwitch">
+              <button className="active" type="button">
+                Hafta
+              </button>
+              <button type="button" disabled>
+                Gün
+              </button>
+              <button type="button" disabled>
+                Rutin
+              </button>
+            </div>
+
+            <div className="calendarProfile">
+              <span>{displayName || roleLabels[profile.role]}</span>
+              <button type="button" onClick={handleLogout} title="Çıkış">
+                ↗
+              </button>
+            </div>
           </div>
-        </div>
+        </header>
 
-        <div className="weekCalendarScroll">
-          <div className="weekCalendarGrid">
-            {visibleWeekDays.map((day) => {
-              const dayLessons = lessons.filter((lesson) =>
-                sameLocalDay(new Date(lesson.starts_at), day)
-              );
-              const isToday = sameLocalDay(day, new Date());
+        {successMessage ? (
+          <div className="successToast calendarToast">{successMessage}</div>
+        ) : null}
 
-              return (
-                <div
-                  className={`calendarDayColumn ${isToday ? "today" : ""}`}
-                  key={day.toISOString()}
-                >
-                  <div className="calendarDayHeader">
-                    <span>
-                      {day
-                        .toLocaleDateString("tr-TR", { weekday: "short" })
-                        .replace(".", "")}
-                    </span>
-                    <strong>{day.getDate()}</strong>
-                  </div>
+        {error ? <div className="calendarError">{error}</div> : null}
 
-                  <div className="calendarDayLessons">
-                    {dayLessons.length === 0 ? (
-                      <div className="calendarEmptyDay">—</div>
-                    ) : (
-                      dayLessons.map((lesson) => {
+        <section className="scheduleSurface">
+          <div className="scheduleScroll">
+            <div className="scheduleCanvas">
+              <div className="scheduleHeader">
+                <div className="timeHeaderCell" />
+                {visibleWeekDays.map((day) => {
+                  const isToday = sameLocalDay(day, new Date());
+
+                  return (
+                    <div
+                      className={`scheduleDayHeader ${isToday ? "today" : ""}`}
+                      key={`header-${day.toISOString()}`}
+                    >
+                      <span>
+                        {day
+                          .toLocaleDateString("tr-TR", { weekday: "short" })
+                          .replace(".", "")
+                          .toUpperCase()}
+                      </span>
+                      <strong>{day.getDate()}</strong>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="scheduleBody">
+                <div className="timeScale">
+                  {Array.from(
+                    { length: CALENDAR_END_HOUR - CALENDAR_START_HOUR + 1 },
+                    (_, index) => CALENDAR_START_HOUR + index
+                  ).map((hour) => (
+                    <div className="timeTick" key={hour}>
+                      {String(hour).padStart(2, "0")}:00
+                    </div>
+                  ))}
+                </div>
+
+                {visibleWeekDays.map((day) => {
+                  const dayLessons = lessons.filter((lesson) =>
+                    sameLocalDay(new Date(lesson.starts_at), day)
+                  );
+                  const isToday = sameLocalDay(day, new Date());
+
+                  return (
+                    <div
+                      className={`scheduleDay ${isToday ? "today" : ""}`}
+                      key={`body-${day.toISOString()}`}
+                    >
+                      {Array.from(
+                        { length: CALENDAR_END_HOUR - CALENDAR_START_HOUR },
+                        (_, index) => (
+                          <div className="hourLine" key={index} />
+                        )
+                      )}
+
+                      {dayLessons.map((lesson) => {
                         const start = new Date(lesson.starts_at);
                         const end = new Date(lesson.ends_at);
+                        const position = lessonPosition(lesson);
 
                         return (
-                          <article className="calendarLesson" key={lesson.id}>
-                            <div className="calendarLessonTime">
+                          <article
+                            className={`timeLessonCard tone-${lessonTone(lesson)}`}
+                            style={position}
+                            key={lesson.id}
+                            title={`${studentNameFromLesson(lesson)} · ${lesson.title}`}
+                          >
+                            <div className="timeLessonMain">
+                              <strong>{studentNameFromLesson(lesson)}</strong>
+                              <span>{lesson.title}</span>
+                            </div>
+
+                            <small>
                               {start.toLocaleTimeString("tr-TR", {
                                 hour: "2-digit",
                                 minute: "2-digit",
@@ -937,13 +1008,6 @@ export default function Home() {
                                 hour: "2-digit",
                                 minute: "2-digit",
                               })}
-                            </div>
-                            <strong>{studentNameFromLesson(lesson)}</strong>
-                            <span>{lesson.title}</span>
-                            <small>
-                              {lesson.lesson_type === "online"
-                                ? "Online"
-                                : "Yüz yüze"}
                             </small>
 
                             {lesson.lesson_type === "online" &&
@@ -953,85 +1017,127 @@ export default function Home() {
                                 target="_blank"
                                 rel="noreferrer"
                               >
-                                Derse katıl ↗
+                                Katıl ↗
                               </a>
                             ) : null}
                           </article>
                         );
-                      })
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
+        </section>
+
+        {teacherDashboard ? (
+          <div className="floatingQuickAction">
+            {quickMenuOpen ? (
+              <div className="quickMenu floatingMenu">
+                <button onClick={openStudentModal}>👤 Öğrenci Ekle</button>
+                <button disabled>📅 Ders Ekle</button>
+                <button disabled>🏖️ Tatil Ekle</button>
+                <button disabled>💳 Ödeme Al</button>
+                <button disabled>📝 Ödev Ver</button>
+                <button disabled>✅ Test Oluştur</button>
+              </div>
+            ) : null}
+
+            <button
+              type="button"
+              className="floatingPlus"
+              onClick={() => setQuickMenuOpen((current) => !current)}
+              aria-expanded={quickMenuOpen}
+              aria-label="Yeni işlem"
+              title="Yeni işlem"
+            >
+              +
+            </button>
+          </div>
+        ) : null}
+      </section>
+
+      {studentPanelOpen ? (
+        <div
+          className="studentDrawerBackdrop"
+          onMouseDown={() => setStudentPanelOpen(false)}
+        >
+          <aside
+            className="studentDrawer"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="studentDrawerHeader">
+              <div>
+                <span className="eyebrow">ÖĞRENCİLER</span>
+                <h2>Öğrenci listesi</h2>
+                <p>{students.length} aktif öğrenci</p>
+              </div>
+              <button
+                type="button"
+                className="modalClose"
+                onClick={() => setStudentPanelOpen(false)}
+                aria-label="Kapat"
+              >
+                ×
+              </button>
+            </div>
+
+            {students.length === 0 ? (
+              <div className="drawerEmpty">
+                Henüz öğrenci eklenmedi.
+              </div>
+            ) : (
+              <div className="studentList drawerStudentList">
+                {students.map((student) => (
+                  <article className="studentRow" key={student.id}>
+                    <div className="studentAvatar">
+                      {student.first_name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="studentInfo">
+                      <strong>
+                        {student.first_name} {student.last_name}
+                      </strong>
+                      <span>
+                        {[student.subject, student.grade_level]
+                          .filter(Boolean)
+                          .join(" · ") || "Ders bilgisi eklenmedi"}
+                      </span>
+                    </div>
+                    <div className="studentFee">
+                      {Number(student.default_lesson_fee || 0).toFixed(2)} €
+                      <span>/ ders</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="studentDeleteButton"
+                      onClick={() => {
+                        setStudentPanelOpen(false);
+                        setStudentToDelete(student);
+                      }}
+                      aria-label={`${student.first_name} ${student.last_name} öğrencisini sil`}
+                      title="Öğrenciyi sil"
+                    >
+                      🗑
+                    </button>
+                  </article>
+                ))}
+              </div>
+            )}
+
+            <button
+              type="button"
+              className="primaryButton drawerAddButton"
+              onClick={() => {
+                setStudentPanelOpen(false);
+                openStudentModal();
+              }}
+            >
+              + Yeni öğrenci
+            </button>
+          </aside>
         </div>
-      </section>
-
-      <section className="contentGrid">
-        <article className="calendarCard">
-          <div className="sectionHeader">
-            <div>
-              <span className="eyebrow">ÖĞRENCİLER</span>
-              <h2>{students.length ? "Öğrenci listesi" : "Henüz öğrenci yok"}</h2>
-            </div>
-          </div>
-
-          {students.length === 0 ? (
-            <div className="emptyState">
-              <div className="emptyIcon">✦</div>
-              <h3>İlk öğrencini ekleyebilirsin</h3>
-              <p>
-                Sağ üstteki “+ Yeni işlem” butonundan “Öğrenci Ekle” seçeneğini
-                kullan.
-              </p>
-            </div>
-          ) : (
-            <div className="studentList">
-              {students.map((student) => (
-                <article className="studentRow" key={student.id}>
-                  <div className="studentAvatar">
-                    {student.first_name.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="studentInfo">
-                    <strong>
-                      {student.first_name} {student.last_name}
-                    </strong>
-                    <span>
-                      {[student.subject, student.grade_level]
-                        .filter(Boolean)
-                        .join(" · ") || "Ders bilgisi eklenmedi"}
-                    </span>
-                  </div>
-                  <div className="studentFee">
-                    {Number(student.default_lesson_fee || 0).toFixed(2)} €
-                    <span>/ ders</span>
-                  </div>
-
-                  <button
-                    type="button"
-                    className="studentDeleteButton"
-                    onClick={() => setStudentToDelete(student)}
-                    aria-label={`${student.first_name} ${student.last_name} öğrencisini sil`}
-                    title="Öğrenciyi sil"
-                  >
-                    🗑
-                  </button>
-                </article>
-              ))}
-            </div>
-          )}
-        </article>
-
-        <aside className="sideCard">
-          <span className="eyebrow">BAĞLANTI DURUMU</span>
-          <h2>Supabase bağlı ✓</h2>
-          <p>Öğrenci kayıtları artık gerçek veritabanında tutuluyor.</p>
-          <div className="checkItem">✓ Kimlik doğrulama</div>
-          <div className="checkItem">✓ Öğretmen profili</div>
-          <div className="checkItem">✓ Öğrenci ekleme</div>
-        </aside>
-      </section>
+      ) : null}
 
       {studentToDelete ? (
         <div
