@@ -1,1775 +1,2400 @@
-"use client";
-
-import { FormEvent, useEffect, useMemo, useState } from "react";
-import { createBrowserSupabaseClient } from "@/lib/supabase/client";
-
-type Profile = {
-  id: string;
-  role: "teacher" | "student" | "parent";
-  first_name: string | null;
-  last_name: string | null;
-};
-
-type Student = {
-  id: string;
-  first_name: string;
-  last_name: string;
-  grade_level: string | null;
-  subject: string | null;
-  default_lesson_fee: number;
-  active: boolean;
-};
-
-
-type Lesson = {
-  id: string;
-  student_id: string;
-  title: string;
-  starts_at: string;
-  ends_at: string;
-  lesson_type: "online" | "in_person";
-  status: "planned" | "completed" | "no_show" | "cancelled";
-  meeting_url: string | null;
-  fee: number;
-  students:
-    | {
-        first_name: string;
-        last_name: string;
-      }
-    | {
-        first_name: string;
-        last_name: string;
-      }[]
-    | null;
-};
-
-function startOfWeek(date: Date) {
-  const result = new Date(date);
-  result.setHours(0, 0, 0, 0);
-  const mondayOffset = (result.getDay() + 6) % 7;
-  result.setDate(result.getDate() - mondayOffset);
-  return result;
+:root {
+  --orange: #f47c3c;
+  --orange-dark: #db6428;
+  --ink: #20242c;
+  --muted: #747b86;
+  --line: #e9e9e9;
+  --surface: #ffffff;
+  --bg: #f7f7f8;
+  --green: #e8f5ec;
+  --blue: #eaf3fb;
 }
 
-function addDays(date: Date, amount: number) {
-  const result = new Date(date);
-  result.setDate(result.getDate() + amount);
-  return result;
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.authShell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(244,124,60,.10), transparent 28%),
+    radial-gradient(circle at 85% 80%, rgba(70,150,120,.09), transparent 26%),
+    var(--bg);
+}
+
+.loginCard,
+.loadingCard {
+  width: min(100%, 460px);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 26px;
+  padding: 28px;
+  box-shadow: 0 24px 60px rgba(25, 30, 40, 0.08);
+}
+
+.loginBrand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 30px;
+}
+
+.loginBrand strong {
+  font-size: 22px;
+}
+
+.loginBrand p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.loginIntro h1 {
+  margin: 8px 0 10px;
+  font-size: 34px;
+  letter-spacing: -0.035em;
+}
+
+.loginIntro p {
+  margin: 0 0 24px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.loginForm {
+  display: grid;
+  gap: 16px;
+}
+
+.loginForm label {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.loginForm input {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 14px;
+  padding: 13px 14px;
+  outline: none;
+  color: var(--ink);
+}
+
+.loginForm input:focus {
+  border-color: #f3b18d;
+  box-shadow: 0 0 0 4px rgba(244, 124, 60, 0.10);
+}
+
+.loginButton {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.loginButton:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.formError {
+  margin: 0;
+  padding: 11px 12px;
+  border-radius: 12px;
+  background: #fff0f0;
+  color: #b84242;
+  font-size: 13px;
+}
+
+.loginFootnote {
+  margin: 18px 0 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.loadingCard {
+  text-align: center;
+  color: var(--muted);
+}
+
+.shell {
+  width: min(1200px, calc(100% - 32px));
+  margin: 0 auto;
+  padding-bottom: 48px;
+}
+
+.topbar {
+  min-height: 82px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand strong {
+  font-size: 22px;
+}
+
+.brand p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.brandMark {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: var(--orange);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  position: relative;
+  box-shadow: 0 8px 20px rgba(244, 124, 60, 0.24);
+}
+
+.paper {
+  font-size: 26px;
+}
+
+.pen {
+  position: absolute;
+  font-size: 18px;
+  right: 7px;
+  bottom: 5px;
+}
+
+.profileArea {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.profileButton,
+.segmented button,
+.logoutButton {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 10px 14px;
+  color: var(--ink);
+}
+
+.logoutButton {
+  color: var(--muted);
+}
+
+.hero {
+  border-radius: 28px;
+  padding: 34px;
+  background:
+    radial-gradient(circle at 85% 15%, rgba(255,255,255,.65), transparent 25%),
+    linear-gradient(135deg, #fff2ea, #fff 65%);
+  border: 1px solid #f4e4da;
+  display: flex;
+  gap: 28px;
+  align-items: end;
+  justify-content: space-between;
+}
+
+.hero h1 {
+  margin: 7px 0 10px;
+  font-size: clamp(32px, 5vw, 52px);
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+  max-width: 720px;
+}
+
+.hero p {
+  color: var(--muted);
+  max-width: 680px;
+  line-height: 1.6;
+}
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .13em;
+  color: var(--orange-dark);
+}
+
+.primaryButton {
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 14px;
+  padding: 14px 18px;
+  background: var(--orange);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 10px 24px rgba(244, 124, 60, 0.22);
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin: 18px 0;
+}
+
+.statCard,
+.calendarCard,
+.sideCard {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+}
+
+.statCard {
+  padding: 18px;
+}
+
+.statCard span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.statCard strong {
+  display: block;
+  margin-top: 10px;
+  font-size: 30px;
+}
+
+.contentGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(270px, .7fr);
+  gap: 18px;
+}
+
+.calendarCard,
+.sideCard {
+  padding: 22px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sectionHeader h2,
+.sideCard h2 {
+  margin: 5px 0 0;
+}
+
+.segmented {
+  display: flex;
+  gap: 6px;
+}
+
+.segmented button {
+  padding: 8px 11px;
+  font-size: 12px;
+}
+
+.segmented .active {
+  background: #fff1e8;
+  color: var(--orange-dark);
+  border-color: #ffd8c2;
+}
+
+.emptyState {
+  min-height: 330px;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  padding: 30px;
+}
+
+.emptyState h3 {
+  margin: 12px 0 4px;
+}
+
+.emptyState p,
+.sideCard p {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.emptyIcon {
+  width: 52px;
+  height: 52px;
+  border-radius: 17px;
+  background: #fff1e8;
+  color: var(--orange);
+  margin: auto;
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+}
+
+.checkItem {
+  margin-top: 10px;
+  padding: 12px;
+  background: var(--green);
+  border-radius: 12px;
+  font-size: 14px;
+}
+
+@media (max-width: 850px) {
+  .statsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .contentGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .primaryButton {
+    width: 100%;
+  }
+
+  .profileArea {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 520px) {
+  .shell {
+    width: min(100% - 20px, 1200px);
+  }
+
+  .topbar {
+    min-height: 70px;
+  }
+
+  .hero {
+    padding: 24px 20px;
+    border-radius: 22px;
+  }
+
+  .statsGrid {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .statCard {
+    padding: 14px;
+  }
+
+  .sectionHeader {
+    align-items: flex-start;
+    gap: 12px;
+    flex-direction: column;
+  }
+
+  .loginCard {
+    padding: 22px;
+    border-radius: 22px;
+  }
 }
 
 
-function addMonths(date: Date, amount: number) {
-  const result = new Date(date);
-  result.setMonth(result.getMonth() + amount);
-  return result;
+/* ===== Student add feature ===== */
+
+.quickActionWrap {
+  position: relative;
+  flex: 0 0 auto;
 }
 
-function startOfMonth(date: Date) {
-  const result = new Date(date.getFullYear(), date.getMonth(), 1);
-  result.setHours(0, 0, 0, 0);
-  return result;
+.quickMenu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+  width: 220px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 18px 45px rgba(25, 30, 40, 0.14);
+  z-index: 20;
 }
 
-function endOfMonth(date: Date) {
-  const result = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-  result.setHours(23, 59, 59, 999);
-  return result;
+.quickMenu button {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 11px 12px;
+  border-radius: 10px;
+  text-align: left;
+  color: var(--ink);
 }
 
-function endOfWeek(date: Date) {
-  const result = startOfWeek(date);
-  result.setDate(result.getDate() + 6);
-  result.setHours(23, 59, 59, 999);
-  return result;
+.quickMenu button:hover:not(:disabled) {
+  background: #fff3ec;
 }
 
-function sameLocalMonth(a: Date, b: Date) {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
+.quickMenu button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
 }
 
-function formatTimeLabel(value: string) {
-  return new Date(value).toLocaleTimeString('tr-TR', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+.successToast {
+  margin-bottom: 14px;
+  padding: 13px 15px;
+  border-radius: 14px;
+  background: #e8f5ec;
+  border: 1px solid #cce7d4;
+  color: #28663a;
+  font-weight: 700;
+  font-size: 14px;
 }
 
-function sameLocalDay(a: Date, b: Date) {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
+.studentList {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
 }
 
-function studentNameFromLesson(lesson: Lesson) {
-  const relation = Array.isArray(lesson.students)
-    ? lesson.students[0]
-    : lesson.students;
+.studentRow {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: #fff;
+}
 
-  if (!relation) return "Öğrenci";
+.studentAvatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  background: #fff1e8;
+  color: var(--orange-dark);
+  font-weight: 800;
+}
 
-  return `${relation.first_name} ${relation.last_name}`.trim();
+.studentInfo {
+  min-width: 0;
+  flex: 1;
+}
+
+.studentInfo strong,
+.studentInfo span,
+.studentFee span {
+  display: block;
+}
+
+.studentInfo strong {
+  margin-bottom: 4px;
+}
+
+.studentInfo span,
+.studentFee span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.studentFee {
+  text-align: right;
+  font-weight: 800;
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(17, 20, 25, 0.42);
+  backdrop-filter: blur(5px);
+}
+
+.modalCard {
+  width: min(760px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  background: #fff;
+  border-radius: 24px;
+  padding: 24px;
+  box-shadow: 0 28px 80px rgba(20, 23, 29, 0.24);
+}
+
+.modalHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.modalHeader h2 {
+  margin: 6px 0 0;
+  font-size: 28px;
+}
+
+.modalClose {
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 22px;
+}
+
+.studentForm {
+  display: grid;
+  gap: 18px;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+.formGrid label {
+  display: grid;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.formGrid input,
+.formGrid textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: #fff;
+  color: var(--ink);
+  padding: 12px 13px;
+  outline: none;
+  resize: vertical;
+}
+
+.formGrid input:focus,
+.formGrid textarea:focus {
+  border-color: #f3b18d;
+  box-shadow: 0 0 0 4px rgba(244, 124, 60, 0.1);
+}
+
+.fullWidth {
+  grid-column: 1 / -1;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.secondaryButton {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 13px 17px;
+  background: #fff;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+@media (max-width: 650px) {
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .fullWidth {
+    grid-column: auto;
+  }
+
+  .modalCard {
+    padding: 19px;
+    border-radius: 20px;
+  }
+
+  .studentRow {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .studentFee {
+    width: 100%;
+    text-align: left;
+    padding-left: 55px;
+  }
+
+  .quickMenu {
+    left: 0;
+    right: auto;
+  }
 }
 
 
-const CALENDAR_START_HOUR = 8;
-const CALENDAR_END_HOUR = 21;
-const CALENDAR_HOUR_HEIGHT = 64;
+/* ===== Guardian fields ===== */
 
-function lessonPosition(lesson: Lesson) {
-  const start = new Date(lesson.starts_at);
-  const end = new Date(lesson.ends_at);
-
-  const startMinutes = start.getHours() * 60 + start.getMinutes();
-  const endMinutes = end.getHours() * 60 + end.getMinutes();
-  const calendarStartMinutes = CALENDAR_START_HOUR * 60;
-
-  const top =
-    ((startMinutes - calendarStartMinutes) / 60) * CALENDAR_HOUR_HEIGHT;
-  const rawHeight =
-    ((endMinutes - startMinutes) / 60) * CALENDAR_HOUR_HEIGHT;
-
-  return {
-    top: `${Math.max(0, top)}px`,
-    height: `${Math.max(34, rawHeight)}px`,
-  };
+.formSection {
+  display: grid;
+  gap: 15px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
 }
 
-function lessonTone(lesson: Lesson) {
-  if (lesson.status === "completed") return "green";
-  if (lesson.status === "cancelled") return "gray";
-  if (lesson.status === "no_show") return "red";
-
-  const tones = ["orange", "green", "blue", "mint"];
-  const seed = Array.from(lesson.student_id).reduce(
-    (total, char) => total + char.charCodeAt(0),
-    0
-  );
-
-  return tones[seed % tones.length];
+.formSectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding-bottom: 2px;
 }
 
-type StudentForm = {
-  firstName: string;
-  lastName: string;
-  birthDate: string;
-  gradeLevel: string;
-  subject: string;
-  privateNote: string;
-  startingBalance: string;
-  defaultLessonFee: string;
+.formSectionTitle > span {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: #fff1e8;
+  color: var(--orange-dark);
+  font-weight: 800;
+}
 
-  guardianFirstName: string;
-  guardianLastName: string;
-  guardianPhone: string;
-  guardianWhatsapp: string;
-  guardianEmail: string;
+.formSectionTitle strong,
+.formSectionTitle small {
+  display: block;
+}
 
-  secondGuardianEnabled: boolean;
-  secondGuardianFirstName: string;
-  secondGuardianLastName: string;
-  secondGuardianPhone: string;
-  secondGuardianWhatsapp: string;
-  secondGuardianEmail: string;
+.formSectionTitle strong {
+  font-size: 15px;
+}
 
-  scheduleEnabled: boolean;
-  lessonDate: string;
-  lessonTime: string;
-  lessonDuration: string;
-  lessonType: "online" | "in_person";
-  weeklyRepeat: boolean;
-  repeatUntil: string;
-  meetingUrl: string;
-};
+.formSectionTitle small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
 
-const emptyStudentForm: StudentForm = {
-  firstName: "",
-  lastName: "",
-  birthDate: "",
-  gradeLevel: "",
-  subject: "",
-  privateNote: "",
-  startingBalance: "0",
-  defaultLessonFee: "0",
+.toggleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
 
-  guardianFirstName: "",
-  guardianLastName: "",
-  guardianPhone: "",
-  guardianWhatsapp: "",
-  guardianEmail: "",
+.toggleRow input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--orange);
+}
 
-  secondGuardianEnabled: false,
-  secondGuardianFirstName: "",
-  secondGuardianLastName: "",
-  secondGuardianPhone: "",
-  secondGuardianWhatsapp: "",
-  secondGuardianEmail: "",
+.secondGuardianBox {
+  padding: 15px;
+  border-radius: 15px;
+  background: #fafafa;
+  border: 1px dashed #dedede;
+}
 
-  scheduleEnabled: true,
-  lessonDate: "",
-  lessonTime: "",
-  lessonDuration: "60",
-  lessonType: "online",
-  weeklyRepeat: false,
-  repeatUntil: "",
-  meetingUrl: "",
-};
 
-const roleLabels: Record<Profile["role"], string> = {
-  teacher: "Öğretmen",
-  student: "Öğrenci",
-  parent: "Veli",
-};
+/* ===== Professional 2-step student wizard ===== */
 
-export default function Home() {
-  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+.stepper {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 70px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  margin: 2px 0 8px;
+}
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+.stepItem {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  color: var(--muted);
+}
 
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [students, setStudents] = useState<Student[]>([]);
-  const [lessons, setLessons] = useState<Lesson[]>([]);
-  const [monthOffset, setMonthOffset] = useState(0);
-  const [currentMonthLessonCount, setCurrentMonthLessonCount] = useState(0);
-  const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
-  const [deletingStudent, setDeletingStudent] = useState(false);
-  const [studentPanelOpen, setStudentPanelOpen] = useState(false);
+.stepItem > span {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--muted);
+  font-weight: 800;
+}
 
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [studentSaving, setStudentSaving] = useState(false);
+.stepItem strong,
+.stepItem small {
+  display: block;
+}
 
-  const [error, setError] = useState("");
-  const [studentError, setStudentError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
+.stepItem strong {
+  color: var(--ink);
+  font-size: 14px;
+}
 
-  const [quickMenuOpen, setQuickMenuOpen] = useState(false);
-  const [studentModalOpen, setStudentModalOpen] = useState(false);
-  const [studentStep, setStudentStep] = useState<1 | 2 | 3>(1);
-  const [studentForm, setStudentForm] =
-    useState<StudentForm>(emptyStudentForm);
+.stepItem small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+}
 
-  const visibleMonthDate = useMemo(() => {
-    return addMonths(startOfMonth(new Date()), monthOffset);
-  }, [monthOffset]);
+.stepItem.active > span {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(244, 124, 60, 0.22);
+}
 
-  const visibleMonthStart = useMemo(
-    () => startOfMonth(visibleMonthDate),
-    [visibleMonthDate]
-  );
+.stepItem.done > span {
+  background: #e8f5ec;
+  border-color: #cce7d4;
+  color: #28663a;
+}
 
-  const visibleMonthGridStart = useMemo(
-    () => startOfWeek(visibleMonthStart),
-    [visibleMonthStart]
-  );
+.stepLine {
+  height: 2px;
+  border-radius: 999px;
+  background: #ececef;
+}
 
-  const visibleMonthDays = useMemo(
-    () => Array.from({ length: 42 }, (_, index) => addDays(visibleMonthGridStart, index)),
-    [visibleMonthGridStart]
-  );
+.stepPanel {
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
+}
 
-  useEffect(() => {
-    let active = true;
+.stepPanelHeader h3 {
+  margin: 6px 0 5px;
+  font-size: 22px;
+}
 
-    async function loadUser() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+.stepPanelHeader p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
 
-      if (!active) return;
+.secondGuardianHeader {
+  margin-bottom: 12px;
+}
 
-      if (!user) {
-        setLoading(false);
-        return;
-      }
+.secondGuardianHeader strong,
+.secondGuardianHeader small {
+  display: block;
+}
 
-      const { data, error: profileError } = await supabase
-        .from("profiles")
-        .select("id, role, first_name, last_name")
-        .eq("id", user.id)
-        .single();
+.secondGuardianHeader small {
+  margin-top: 3px;
+  color: var(--muted);
+}
 
-      if (!active) return;
+.wizardActions {
+  padding-top: 2px;
+}
 
-      if (profileError || !data) {
-        setError("Profil bilgileri yüklenemedi.");
-        setLoading(false);
-        return;
-      }
-
-      const loadedProfile = data as Profile;
-      setProfile(loadedProfile);
-
-      if (loadedProfile.role === "teacher") {
-        await loadStudents(loadedProfile.id);
-      }
-
-      setLoading(false);
-    }
-
-    loadUser();
-
-    return () => {
-      active = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabase]);
-
-  useEffect(() => {
-    if (!profile || profile.role !== "teacher") return;
-    loadLessons(profile.id, monthOffset);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.id, profile?.role, monthOffset]);
-
-  async function loadStudents(teacherId: string) {
-    const { data, error: studentsError } = await supabase
-      .from("students")
-      .select(
-        "id, first_name, last_name, grade_level, subject, default_lesson_fee, active"
-      )
-      .eq("teacher_id", teacherId)
-      .order("created_at", { ascending: false });
-
-    if (studentsError) {
-      setError("Öğrenci listesi yüklenemedi.");
-      return;
-    }
-
-    setStudents((data ?? []) as Student[]);
+@media (max-width: 650px) {
+  .stepper {
+    grid-template-columns: 1fr;
+    gap: 10px;
   }
 
-  async function loadLessons(teacherId: string, offset = monthOffset) {
-    const targetMonth = addMonths(startOfMonth(new Date()), offset);
-    const rangeStart = startOfWeek(startOfMonth(targetMonth));
-    const rangeEnd = addDays(endOfWeek(endOfMonth(targetMonth)), 1);
-
-    const { data, error: lessonsError } = await supabase
-      .from("lessons")
-      .select(
-        "id, student_id, title, starts_at, ends_at, lesson_type, status, meeting_url, fee, students(first_name, last_name)"
-      )
-      .eq("teacher_id", teacherId)
-      .gte("starts_at", rangeStart.toISOString())
-      .lt("starts_at", rangeEnd.toISOString())
-      .order("starts_at", { ascending: true });
-
-    if (lessonsError) {
-      setError(`Dersler yüklenemedi: ${lessonsError.message}`);
-      return;
-    }
-
-    const loadedLessons = (data ?? []) as Lesson[];
-    setLessons(loadedLessons);
-    setCurrentMonthLessonCount(
-      loadedLessons.filter((lesson) =>
-        sameLocalMonth(new Date(lesson.starts_at), targetMonth)
-      ).length
-    );
+  .stepLine {
+    display: none;
   }
 
-  async function handleLogin(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSubmitting(true);
-    setError("");
-
-    const { data, error: loginError } =
-      await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-    if (loginError || !data.user) {
-      setError("E-posta veya şifre hatalı.");
-      setSubmitting(false);
-      return;
-    }
-
-    const { data: profileData, error: profileError } = await supabase
-      .from("profiles")
-      .select("id, role, first_name, last_name")
-      .eq("id", data.user.id)
-      .single();
-
-    if (profileError || !profileData) {
-      setError("Hesap bulundu ancak profil yüklenemedi.");
-      await supabase.auth.signOut();
-      setSubmitting(false);
-      return;
-    }
-
-    const loadedProfile = profileData as Profile;
-    setProfile(loadedProfile);
-
-    if (loadedProfile.role === "teacher") {
-      await loadStudents(loadedProfile.id);
-    }
-
-    setPassword("");
-    setSubmitting(false);
+  .stepItem {
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
   }
 
-  async function handleLogout() {
-    await supabase.auth.signOut();
-    setProfile(null);
-    setStudents([]);
-    setLessons([]);
-    setMonthOffset(0);
-    setCurrentMonthLessonCount(0);
-    setEmail("");
-    setPassword("");
+  .stepItem.active {
+    background: #fff7f2;
+    border-color: #f5d7c6;
   }
 
-  async function handleDeleteStudent() {
-    if (!profile || !studentToDelete || profile.role !== "teacher") return;
-
-    setDeletingStudent(true);
-    setError("");
-
-    const { error: deleteError } = await supabase
-      .from("students")
-      .delete()
-      .eq("id", studentToDelete.id)
-      .eq("teacher_id", profile.id);
-
-    if (deleteError) {
-      setError(`Öğrenci silinemedi: ${deleteError.message}`);
-      setDeletingStudent(false);
-      return;
-    }
-
-    const deletedName =
-      `${studentToDelete.first_name} ${studentToDelete.last_name}`.trim();
-
-    setStudentToDelete(null);
-    setDeletingStudent(false);
-    await Promise.all([
-      loadStudents(profile.id),
-      loadLessons(profile.id, monthOffset),
-    ]);
-
-    setSuccessMessage(`${deletedName} ve bağlı kayıtları silindi.`);
-    window.setTimeout(() => setSuccessMessage(""), 4000);
+  .stepPanel {
+    padding: 16px;
   }
 
-  function openStudentModal() {
-    setStudentForm(emptyStudentForm);
-    setStudentStep(1);
-    setStudentError("");
-    setSuccessMessage("");
-    setQuickMenuOpen(false);
-    setStudentModalOpen(true);
+  .wizardActions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+
+/* ===== Step 3: lesson scheduling ===== */
+
+.stepperThree {
+  grid-template-columns:
+    minmax(0, 1fr) 42px
+    minmax(0, 1fr) 42px
+    minmax(0, 1fr);
+}
+
+.formGrid select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: #fff;
+  color: var(--ink);
+  padding: 12px 13px;
+  outline: none;
+}
+
+.formGrid select:focus {
+  border-color: #f3b18d;
+  box-shadow: 0 0 0 4px rgba(244, 124, 60, 0.1);
+}
+
+.scheduleToggle {
+  padding: 13px 14px;
+  border-radius: 14px;
+  background: #fff7f2;
+  border: 1px solid #f5d7c6;
+}
+
+.scheduleSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 15px;
+  border-radius: 14px;
+  background: #f7f7f8;
+  border: 1px solid var(--line);
+}
+
+.scheduleSummary span {
+  color: var(--orange-dark);
+  font-weight: 800;
+}
+
+.scheduleSkip {
+  padding: 16px;
+  border: 1px dashed #d9d9de;
+  border-radius: 14px;
+  color: var(--muted);
+  background: #fafafa;
+  line-height: 1.5;
+}
+
+@media (max-width: 800px) {
+  .stepperThree {
+    grid-template-columns: 1fr;
   }
 
-  function closeStudentModal() {
-    if (studentSaving) return;
-    setStudentModalOpen(false);
-    setStudentError("");
+  .stepperThree .stepLine {
+    display: none;
+  }
+}
+
+
+/* ===== Real weekly calendar + student deletion ===== */
+
+.weekCalendarCard {
+  margin: 18px 0;
+  padding: 22px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+}
+
+.calendarTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.calendarTop h2 {
+  margin: 5px 0 0;
+  font-size: 24px;
+}
+
+.calendarNav {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.calendarNavButton,
+.calendarTodayButton {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  border-radius: 11px;
+  height: 38px;
+}
+
+.calendarNavButton {
+  width: 38px;
+}
+
+.calendarTodayButton {
+  padding: 0 13px;
+  font-weight: 700;
+}
+
+.weekCalendarScroll {
+  overflow-x: auto;
+  padding-bottom: 5px;
+}
+
+.weekCalendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(145px, 1fr));
+  min-width: 1015px;
+  border: 1px solid var(--line);
+  border-radius: 17px;
+  overflow: hidden;
+}
+
+.calendarDayColumn {
+  min-height: 245px;
+  background: #fff;
+  border-right: 1px solid var(--line);
+}
+
+.calendarDayColumn:last-child {
+  border-right: 0;
+}
+
+.calendarDayColumn.today {
+  background: #fffaf7;
+}
+
+.calendarDayHeader {
+  min-height: 64px;
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.calendarDayHeader span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.calendarDayHeader strong {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 15px;
+}
+
+.calendarDayColumn.today .calendarDayHeader strong {
+  color: #fff;
+  background: var(--orange);
+}
+
+.calendarDayLessons {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 9px;
+}
+
+.calendarEmptyDay {
+  padding-top: 20px;
+  text-align: center;
+  color: #c6c8cd;
+}
+
+.calendarLesson {
+  padding: 10px;
+  border-radius: 12px;
+  background: #fff1e8;
+  border: 1px solid #f8d7c3;
+  display: grid;
+  gap: 4px;
+}
+
+.calendarLessonTime {
+  color: var(--orange-dark);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.calendarLesson strong {
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.calendarLesson span,
+.calendarLesson small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.calendarLesson a {
+  margin-top: 3px;
+  color: var(--orange-dark);
+  font-size: 11px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.studentDeleteButton {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  background: transparent;
+  opacity: 0.5;
+}
+
+.studentDeleteButton:hover {
+  opacity: 1;
+  background: #fff1f1;
+  border-color: #f4d0d0;
+}
+
+.confirmCard {
+  width: min(440px, 100%);
+  padding: 28px;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 28px 80px rgba(20, 23, 29, 0.25);
+  text-align: center;
+}
+
+.confirmCard h2 {
+  margin: 14px 0 8px;
+}
+
+.confirmCard p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.dangerIcon {
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  margin: 0 auto;
+  border-radius: 17px;
+  background: #fff0f0;
+  font-size: 23px;
+}
+
+.confirmActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.dangerButton {
+  border: 0;
+  border-radius: 14px;
+  padding: 13px 15px;
+  background: #c84545;
+  color: #fff;
+  font-weight: 800;
+}
+
+.dangerButton:disabled {
+  opacity: 0.6;
+}
+
+@media (max-width: 650px) {
+  .calendarTop {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
-  function updateStudentField<K extends keyof StudentForm>(
-    field: K,
-    value: StudentForm[K]
-  ) {
-    setStudentForm((current) => ({
-      ...current,
-      [field]: value,
-    }));
+  .studentDeleteButton {
+    margin-left: auto;
   }
 
-  function goToGuardianStep() {
-    setStudentError("");
+  .confirmActions {
+    grid-template-columns: 1fr;
+  }
+}
 
-    if (!studentForm.firstName.trim() || !studentForm.lastName.trim()) {
-      setStudentError("Devam etmek için öğrencinin adı ve soyadı zorunludur.");
-      return;
-    }
 
-    const startingBalance = Number(studentForm.startingBalance || 0);
-    const lessonFee = Number(studentForm.defaultLessonFee || 0);
+/* ============================================================
+   Calendar-first dashboard (reference-inspired)
+   ============================================================ */
 
-    if (Number.isNaN(startingBalance) || Number.isNaN(lessonFee)) {
-      setStudentError("Bakiye ve ders ücreti sayı olmalıdır.");
-      return;
-    }
+.calendarApp {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  background: #f4f4f5;
+}
 
-    if (lessonFee < 0) {
-      setStudentError("Ders ücreti negatif olamaz.");
-      return;
-    }
+.calendarSidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-right: 1px solid #ececef;
+  background: rgba(255, 255, 255, 0.96);
+  padding: 15px 10px;
+}
 
-    setStudentStep(2);
+.sidebarBrand {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 55px;
+  margin-bottom: 14px;
+}
+
+.sidebarLogo {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: var(--orange);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  position: relative;
+  box-shadow: 0 8px 22px rgba(244, 124, 60, 0.22);
+}
+
+.sidebarLogo span {
+  font-size: 25px;
+}
+
+.sidebarLogo b {
+  position: absolute;
+  right: 6px;
+  bottom: 4px;
+  font-size: 15px;
+}
+
+.sidebarNav,
+.sidebarBottom {
+  width: 100%;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+}
+
+.sidebarBottom {
+  margin-top: auto;
+}
+
+.sidebarButton {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 13px;
+  background: transparent;
+  color: #7b8089;
+  font-size: 18px;
+}
+
+.sidebarButton:hover:not(:disabled) {
+  background: #f7f7f8;
+  color: var(--ink);
+}
+
+.sidebarButton.active {
+  background: #fff2ea;
+  color: var(--orange-dark);
+}
+
+.sidebarButton:disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+
+.calendarWorkspace {
+  min-width: 0;
+  padding: 14px;
+}
+
+.calendarToolbar {
+  min-height: 78px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 4px 8px 14px;
+}
+
+.monthNavigator {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.monthNavigator > button {
+  width: 34px;
+  height: 34px;
+  border: 1px solid #e7e7ea;
+  border-radius: 11px;
+  background: #fff;
+  color: #686d75;
+  font-size: 23px;
+  line-height: 1;
+}
+
+.monthNavigator h1 {
+  margin: 0;
+  text-transform: capitalize;
+  font-size: 24px;
+  letter-spacing: -0.025em;
+}
+
+.monthNavigator p {
+  margin: 4px 0 0;
+  color: #969aa2;
+  font-size: 12px;
+}
+
+.calendarToolbarActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.todayCompactButton {
+  height: 36px;
+  padding: 0 13px;
+  border: 1px solid #e8e8eb;
+  border-radius: 999px;
+  background: #fff;
+  color: #555b65;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.calendarViewSwitch {
+  display: flex;
+  align-items: center;
+  padding: 3px;
+  border-radius: 999px;
+  background: #ededf0;
+}
+
+.calendarViewSwitch button {
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 16px;
+  background: transparent;
+  color: #858991;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.calendarViewSwitch button.active {
+  background: var(--orange);
+  color: #fff;
+  box-shadow: 0 3px 10px rgba(244, 124, 60, 0.22);
+}
+
+.calendarViewSwitch button:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.calendarProfile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 4px;
+}
+
+.calendarProfile > span {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #656b74;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.calendarProfile button {
+  width: 34px;
+  height: 34px;
+  border: 1px solid #e7e7ea;
+  border-radius: 50%;
+  background: #fff;
+  color: #777c85;
+}
+
+.calendarToast,
+.calendarError {
+  margin: 0 0 10px;
+}
+
+.calendarError {
+  padding: 11px 14px;
+  border-radius: 13px;
+  background: #fff0f0;
+  color: #b84242;
+  border: 1px solid #f3d1d1;
+  font-size: 13px;
+}
+
+.scheduleSurface {
+  overflow: hidden;
+  min-height: calc(100vh - 108px);
+  border: 1px solid #e8e8eb;
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 14px 38px rgba(27, 31, 39, 0.04);
+}
+
+.scheduleScroll {
+  overflow: auto;
+  width: 100%;
+  height: calc(100vh - 110px);
+}
+
+.scheduleCanvas {
+  min-width: 1120px;
+}
+
+.scheduleHeader {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: 64px repeat(7, minmax(145px, 1fr));
+  min-width: 1120px;
+  height: 66px;
+  border-bottom: 1px solid #ececef;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(9px);
+}
+
+.timeHeaderCell {
+  border-right: 1px solid #f0f0f2;
+}
+
+.scheduleDayHeader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-right: 1px solid #f2f2f4;
+}
+
+.scheduleDayHeader:last-child {
+  border-right: 0;
+}
+
+.scheduleDayHeader span {
+  color: #a1a4aa;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+}
+
+.scheduleDayHeader strong {
+  width: 29px;
+  height: 29px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 14px;
+}
+
+.scheduleDayHeader.today strong {
+  background: var(--orange);
+  color: #fff;
+}
+
+.scheduleDayHeader.today span {
+  color: var(--orange-dark);
+}
+
+.scheduleBody {
+  display: grid;
+  grid-template-columns: 64px repeat(7, minmax(145px, 1fr));
+  min-width: 1120px;
+  height: calc((21 - 8) * 64px);
+}
+
+.timeScale {
+  position: relative;
+  border-right: 1px solid #eeeeef;
+  background: #fff;
+}
+
+.timeTick {
+  height: 64px;
+  padding: 9px 9px 0 0;
+  text-align: right;
+  color: #aaaeb5;
+  font-size: 10px;
+  transform: translateY(-15px);
+}
+
+.scheduleDay {
+  position: relative;
+  height: calc((21 - 8) * 64px);
+  border-right: 1px solid #f0f0f2;
+  background: #fff;
+}
+
+.scheduleDay:last-child {
+  border-right: 0;
+}
+
+.scheduleDay.today {
+  background: rgba(244, 124, 60, 0.018);
+}
+
+.hourLine {
+  height: 64px;
+  border-bottom: 1px solid #f2f2f4;
+}
+
+.timeLessonCard {
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  z-index: 5;
+  min-height: 34px;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 7px 8px;
+  box-shadow: 0 2px 7px rgba(20, 24, 31, 0.035);
+}
+
+.timeLessonMain {
+  display: grid;
+  gap: 2px;
+}
+
+.timeLessonCard strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  line-height: 1.15;
+}
+
+.timeLessonCard span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.72;
+  font-size: 10px;
+}
+
+.timeLessonCard small {
+  display: block;
+  margin-top: 4px;
+  opacity: 0.7;
+  font-size: 9px;
+}
+
+.timeLessonCard a {
+  display: inline-block;
+  margin-top: 4px;
+  color: inherit;
+  font-size: 9px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.timeLessonCard.tone-orange {
+  border-color: #f6d9c7;
+  background: #fff1e8;
+  color: #bd5d2e;
+}
+
+.timeLessonCard.tone-green {
+  border-color: #cce8d4;
+  background: #ecf8ef;
+  color: #35744a;
+}
+
+.timeLessonCard.tone-blue {
+  border-color: #d7e0f6;
+  background: #eef2fd;
+  color: #5470a8;
+}
+
+.timeLessonCard.tone-mint {
+  border-color: #cee9e4;
+  background: #ebf7f5;
+  color: #3b7770;
+}
+
+.timeLessonCard.tone-red {
+  border-color: #efd2d2;
+  background: #fff0f0;
+  color: #a94d4d;
+}
+
+.timeLessonCard.tone-gray {
+  border-color: #e0e0e2;
+  background: #f4f4f5;
+  color: #81858d;
+}
+
+.floatingQuickAction {
+  position: fixed;
+  right: 28px;
+  bottom: 24px;
+  z-index: 50;
+}
+
+.floatingPlus {
+  width: 58px;
+  height: 58px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--orange);
+  color: #fff;
+  font-size: 31px;
+  font-weight: 300;
+  box-shadow: 0 14px 32px rgba(244, 124, 60, 0.32);
+}
+
+.quickMenu.floatingMenu {
+  top: auto;
+  right: 0;
+  bottom: 70px;
+  width: 220px;
+}
+
+.studentDrawerBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(21, 24, 30, 0.18);
+  backdrop-filter: blur(2px);
+}
+
+.studentDrawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: min(500px, 92vw);
+  height: 100%;
+  overflow: auto;
+  padding: 26px;
+  background: #fff;
+  box-shadow: -18px 0 55px rgba(20, 24, 31, 0.14);
+}
+
+.studentDrawerHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.studentDrawerHeader h2 {
+  margin: 6px 0 3px;
+  font-size: 25px;
+}
+
+.studentDrawerHeader p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.drawerStudentList {
+  margin: 18px 0;
+}
+
+.drawerEmpty {
+  margin: 28px 0;
+  padding: 30px 15px;
+  border: 1px dashed #dedee2;
+  border-radius: 16px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.drawerAddButton {
+  width: 100%;
+}
+
+@media (max-width: 850px) {
+  .calendarApp {
+    grid-template-columns: 60px minmax(0, 1fr);
   }
 
-  function goToScheduleStep() {
-    setStudentError("");
-
-    if (
-      !studentForm.guardianFirstName.trim() ||
-      !studentForm.guardianLastName.trim()
-    ) {
-      setStudentError("Devam etmek için birinci velinin adı ve soyadı zorunludur.");
-      return;
-    }
-
-    if (
-      studentForm.secondGuardianEnabled &&
-      (!studentForm.secondGuardianFirstName.trim() ||
-        !studentForm.secondGuardianLastName.trim())
-    ) {
-      setStudentError(
-        "İkinci veli açıksa ikinci velinin adı ve soyadı zorunludur."
-      );
-      return;
-    }
-
-    setStudentStep(3);
+  .calendarSidebar {
+    padding-inline: 7px;
   }
 
-  function buildLessonRows(studentId: string, teacherId: string) {
-    if (!studentForm.scheduleEnabled) return [];
-
-    if (!studentForm.lessonDate || !studentForm.lessonTime) {
-      throw new Error("İlk ders tarihi ve saati zorunludur.");
-    }
-
-    const duration = Number(studentForm.lessonDuration || 60);
-    if (!Number.isFinite(duration) || duration <= 0) {
-      throw new Error("Ders süresi geçerli bir sayı olmalıdır.");
-    }
-
-    if (studentForm.weeklyRepeat && !studentForm.repeatUntil) {
-      throw new Error("Haftalık tekrar için bitiş tarihi seçmelisin.");
-    }
-
-    const firstStart = new Date(
-      `${studentForm.lessonDate}T${studentForm.lessonTime}:00`
-    );
-
-    if (Number.isNaN(firstStart.getTime())) {
-      throw new Error("Ders tarihi veya saati geçersiz.");
-    }
-
-    const lastDate = studentForm.weeklyRepeat
-      ? new Date(`${studentForm.repeatUntil}T23:59:59`)
-      : firstStart;
-
-    if (studentForm.weeklyRepeat && lastDate < firstStart) {
-      throw new Error("Tekrar bitiş tarihi ilk dersten önce olamaz.");
-    }
-
-    const recurrenceGroupId = studentForm.weeklyRepeat
-      ? crypto.randomUUID()
-      : null;
-
-    const rows = [];
-    const current = new Date(firstStart);
-    let safetyCounter = 0;
-
-    while (current <= lastDate && safetyCounter < 160) {
-      const end = new Date(current.getTime() + duration * 60_000);
-
-      rows.push({
-        teacher_id: teacherId,
-        student_id: studentId,
-        title: studentForm.subject.trim() || "Ders",
-        starts_at: current.toISOString(),
-        ends_at: end.toISOString(),
-        lesson_type: studentForm.lessonType,
-        status: "planned",
-        meeting_url:
-          studentForm.lessonType === "online"
-            ? studentForm.meetingUrl.trim() || null
-            : null,
-        fee: Number(studentForm.defaultLessonFee || 0),
-        recurrence_group_id: recurrenceGroupId,
-        recurrence_rule: studentForm.weeklyRepeat
-          ? `FREQ=WEEKLY;UNTIL=${studentForm.repeatUntil}`
-          : null,
-      });
-
-      if (!studentForm.weeklyRepeat) break;
-
-      current.setDate(current.getDate() + 7);
-      safetyCounter += 1;
-    }
-
-    return rows;
+  .sidebarButton {
+    width: 40px;
+    height: 40px;
   }
 
-  async function handleAddStudent(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (!profile || profile.role !== "teacher") {
-      setStudentError("Bu işlem için öğretmen hesabı gerekir.");
-      return;
-    }
-
-    if (!studentForm.firstName.trim() || !studentForm.lastName.trim()) {
-      setStudentError("Öğrencinin adı ve soyadı zorunludur.");
-      setStudentStep(1);
-      return;
-    }
-
-    if (
-      !studentForm.guardianFirstName.trim() ||
-      !studentForm.guardianLastName.trim()
-    ) {
-      setStudentError("Birinci velinin adı ve soyadı zorunludur.");
-      setStudentStep(2);
-      return;
-    }
-
-    if (
-      studentForm.secondGuardianEnabled &&
-      (!studentForm.secondGuardianFirstName.trim() ||
-        !studentForm.secondGuardianLastName.trim())
-    ) {
-      setStudentError(
-        "İkinci veli açıksa ikinci velinin adı ve soyadı zorunludur."
-      );
-      setStudentStep(2);
-      return;
-    }
-
-    const startingBalance = Number(studentForm.startingBalance || 0);
-    const lessonFee = Number(studentForm.defaultLessonFee || 0);
-
-    if (Number.isNaN(startingBalance) || Number.isNaN(lessonFee)) {
-      setStudentError("Bakiye ve ders ücreti sayı olmalıdır.");
-      setStudentStep(1);
-      return;
-    }
-
-    if (lessonFee < 0) {
-      setStudentError("Ders ücreti negatif olamaz.");
-      setStudentStep(1);
-      return;
-    }
-
-    let lessonRows: Array<Record<string, unknown>> = [];
-
-    try {
-      lessonRows = buildLessonRows("TEMP", profile.id);
-    } catch (scheduleError) {
-      setStudentError(
-        scheduleError instanceof Error
-          ? scheduleError.message
-          : "Ders programı kontrol edilemedi."
-      );
-      setStudentStep(3);
-      return;
-    }
-
-    setStudentSaving(true);
-    setStudentError("");
-
-    // ID'yi istemci tarafında oluşturuyoruz. Böylece INSERT sonrasında
-    // .select("id") / RETURNING çalıştırmak zorunda kalmıyoruz.
-    // Bu, RLS'nin yeni satırı RETURNING aşamasında tekrar SELECT etmesinden
-    // kaynaklanan hatayı önler.
-    const newStudentId = crypto.randomUUID();
-
-    const { error: insertError } = await supabase
-      .from("students")
-      .insert({
-        id: newStudentId,
-        teacher_id: profile.id,
-        first_name: studentForm.firstName.trim(),
-        last_name: studentForm.lastName.trim(),
-        birth_date: studentForm.birthDate || null,
-        grade_level: studentForm.gradeLevel.trim() || null,
-        subject: studentForm.subject.trim() || null,
-        private_note: studentForm.privateNote.trim() || null,
-        starting_balance: startingBalance,
-        default_lesson_fee: lessonFee,
-        active: true,
-      });
-
-    if (insertError) {
-      setStudentError(`Öğrenci kaydedilemedi: ${insertError.message}`);
-      setStudentSaving(false);
-      return;
-    }
-
-    const guardiansToInsert = [
-      {
-        teacher_id: profile.id,
-        student_id: newStudentId,
-        first_name: studentForm.guardianFirstName.trim(),
-        last_name: studentForm.guardianLastName.trim(),
-        phone: studentForm.guardianPhone.trim() || null,
-        whatsapp_phone: studentForm.guardianWhatsapp.trim() || null,
-        email: studentForm.guardianEmail.trim() || null,
-        relation_label: "Veli",
-        is_primary: true,
-      },
-    ];
-
-    if (studentForm.secondGuardianEnabled) {
-      guardiansToInsert.push({
-        teacher_id: profile.id,
-        student_id: newStudentId,
-        first_name: studentForm.secondGuardianFirstName.trim(),
-        last_name: studentForm.secondGuardianLastName.trim(),
-        phone: studentForm.secondGuardianPhone.trim() || null,
-        whatsapp_phone: studentForm.secondGuardianWhatsapp.trim() || null,
-        email: studentForm.secondGuardianEmail.trim() || null,
-        relation_label: "Veli",
-        is_primary: false,
-      });
-    }
-
-    const { error: guardianError } = await supabase
-      .from("guardians")
-      .insert(guardiansToInsert);
-
-    if (guardianError) {
-      await supabase.from("students").delete().eq("id", newStudentId);
-      setStudentError(
-        `Veli bilgileri kaydedilemedi: ${guardianError.message}`
-      );
-      setStudentSaving(false);
-      return;
-    }
-
-    if (studentForm.scheduleEnabled) {
-      lessonRows = buildLessonRows(newStudentId, profile.id);
-
-      const { error: lessonError } = await supabase
-        .from("lessons")
-        .insert(lessonRows);
-
-      if (lessonError) {
-        await supabase.from("students").delete().eq("id", newStudentId);
-        setStudentError(
-          `Ders programı kaydedilemedi: ${lessonError.message}`
-        );
-        setStudentSaving(false);
-        return;
-      }
-    }
-
-    await Promise.all([
-      loadStudents(profile.id),
-      loadLessons(profile.id, monthOffset),
-    ]);
-
-    const savedStudentName =
-      `${studentForm.firstName.trim()} ${studentForm.lastName.trim()}`;
-
-    setStudentSaving(false);
-    setStudentModalOpen(false);
-    setStudentStep(1);
-    setStudentForm(emptyStudentForm);
-    setSuccessMessage(
-      studentForm.scheduleEnabled
-        ? `${savedStudentName}, veli bilgileri ve ders programı başarıyla eklendi.`
-        : `${savedStudentName} ve veli bilgileri başarıyla eklendi.`
-    );
-
-    window.setTimeout(() => {
-      setSuccessMessage("");
-    }, 4000);
+  .calendarToolbar {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
-  if (loading) {
-    return (
-      <main className="authShell">
-        <div className="loadingCard">Takipet yükleniyor…</div>
-      </main>
-    );
+  .calendarToolbarActions {
+    width: 100%;
+    justify-content: space-between;
   }
 
-  if (!profile) {
-    return (
-      <main className="authShell">
-        <section className="loginCard">
-          <div className="loginBrand">
-            <div className="brandMark" aria-hidden="true">
-              <span className="paper">▱</span>
-              <span className="pen">✎</span>
-            </div>
-            <div>
-              <strong>Takipet</strong>
-              <p>Özel ders yönetimi</p>
-            </div>
-          </div>
-
-          <div className="loginIntro">
-            <span className="eyebrow">HOŞ GELDİN</span>
-            <h1>Hesabına giriş yap</h1>
-            <p>Ders, öğrenci, ödev, test ve ödemelerini tek yerden yönet.</p>
-          </div>
-
-          <form className="loginForm" onSubmit={handleLogin}>
-            <label>
-              E-posta
-              <input
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="ornek@email.com"
-                autoComplete="email"
-                required
-              />
-            </label>
-
-            <label>
-              Şifre
-              <input
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="••••••••"
-                autoComplete="current-password"
-                required
-              />
-            </label>
-
-            {error ? <p className="formError">{error}</p> : null}
-
-            <button
-              className="primaryButton loginButton"
-              type="submit"
-              disabled={submitting}
-            >
-              {submitting ? "Giriş yapılıyor…" : "Giriş Yap"}
-            </button>
-          </form>
-
-          <p className="loginFootnote">
-            Takipet hesabın öğretmenin tarafından oluşturulur.
-          </p>
-        </section>
-      </main>
-    );
+  .calendarProfile > span {
+    display: none;
   }
 
-  const displayName = [profile.first_name, profile.last_name]
-    .filter(Boolean)
-    .join(" ");
+  .scheduleScroll {
+    height: calc(100vh - 162px);
+  }
 
-  const teacherDashboard = profile.role === "teacher";
+  .scheduleSurface {
+    min-height: calc(100vh - 160px);
+  }
+}
 
-  return (
-    <main className="plannerApp">
-      <aside className="plannerSidebar">
-        <div className="plannerBrand">
-          <div className="plannerBrandMark" aria-hidden="true">
-            <span className="paper">▱</span>
-            <span className="pen">✎</span>
-          </div>
-          <div>
-            <strong>Takipet</strong>
-            <p>Özel ders yönetimi</p>
-          </div>
-        </div>
+@media (max-width: 560px) {
+  .calendarApp {
+    display: block;
+  }
 
-        <div className="sidebarBlock">
-          <span className="sidebarBlockTitle">ANA MENÜ</span>
-          <button className="sidebarListItem active" type="button">
-            <span>🗓</span>
-            <b>Takvim</b>
-          </button>
-          <button
-            className="sidebarListItem"
-            type="button"
-            onClick={() => setStudentPanelOpen(true)}
-          >
-            <span>👥</span>
-            <b>Öğrenciler</b>
-          </button>
-          <button className="sidebarListItem" type="button" disabled>
-            <span>📚</span>
-            <b>Dersler</b>
-          </button>
-          <button className="sidebarListItem" type="button" disabled>
-            <span>📝</span>
-            <b>Ödevler</b>
-          </button>
-          <button className="sidebarListItem" type="button" disabled>
-            <span>💳</span>
-            <b>Ödemeler</b>
-          </button>
-          <button className="sidebarListItem" type="button" disabled>
-            <span>✅</span>
-            <b>Testler</b>
-          </button>
-        </div>
+  .calendarSidebar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    height: 62px;
+    width: 100%;
+    padding: 7px 10px;
+    flex-direction: row;
+    justify-content: space-around;
+    border-right: 0;
+    border-top: 1px solid #e8e8eb;
+  }
 
-        <div className="sidebarBlock sidebarMeta">
-          <span className="sidebarBlockTitle">ÖZET</span>
-          <div className="sidebarStat">
-            <strong>{students.length}</strong>
-            <span>aktif öğrenci</span>
-          </div>
-          <div className="sidebarStat">
-            <strong>{currentMonthLessonCount}</strong>
-            <span>bu ay planlanan ders</span>
-          </div>
-        </div>
+  .sidebarBrand,
+  .sidebarBottom {
+    display: none;
+  }
 
-        <div className="sidebarFooter">
-          <div className="sidebarUser">
-            <small>{roleLabels[profile.role]}</small>
-            <strong>{displayName || roleLabels[profile.role]}</strong>
-          </div>
-          <button type="button" className="sidebarLogout" onClick={handleLogout}>
-            Çıkış
-          </button>
-        </div>
-      </aside>
+  .sidebarNav {
+    width: 100%;
+    grid-template-columns: repeat(5, 1fr);
+  }
 
-      <section className="plannerWorkspace">
-        <header className="plannerTopbar">
-          <div className="plannerTopbarLeft">
-            <h1>
-              {visibleMonthDate.toLocaleDateString("tr-TR", {
-                month: "long",
-                year: "numeric",
-              })}
-            </h1>
-            <p>
-              Tüm ekran takvim görünümü · {students.length} öğrenci · {currentMonthLessonCount} ders
-            </p>
-          </div>
+  .calendarWorkspace {
+    padding: 8px 8px 72px;
+  }
 
-          <div className="plannerTopbarRight">
-            <div className="viewSwitchPill">
-              <button type="button" disabled>Gün</button>
-              <button type="button" disabled>Hafta</button>
-              <button type="button" className="active">Ay</button>
-              <button type="button" disabled>Yıl</button>
-            </div>
+  .monthNavigator h1 {
+    font-size: 20px;
+  }
 
-            <div className="plannerNavButtons">
-              <button
-                type="button"
-                onClick={() => setMonthOffset((value) => value - 1)}
-                aria-label="Önceki ay"
-              >
-                ‹
-              </button>
-              <button
-                type="button"
-                className="todayGhostButton"
-                onClick={() => setMonthOffset(0)}
-              >
-                Bugün
-              </button>
-              <button
-                type="button"
-                onClick={() => setMonthOffset((value) => value + 1)}
-                aria-label="Sonraki ay"
-              >
-                ›
-              </button>
-            </div>
-          </div>
-        </header>
+  .monthNavigator p {
+    font-size: 11px;
+  }
 
-        {successMessage ? (
-          <div className="successToast plannerToast">{successMessage}</div>
-        ) : null}
+  .calendarViewSwitch button {
+    padding: 7px 12px;
+  }
 
-        {error ? <div className="calendarError">{error}</div> : null}
+  .todayCompactButton {
+    display: none;
+  }
 
-        <section className="monthPlannerSurface">
-          <div className="monthWeekdayRow">
-            {["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"].map((label) => (
-              <div className="monthWeekdayCell" key={label}>
-                {label}
-              </div>
-            ))}
-          </div>
+  .scheduleScroll {
+    height: calc(100vh - 170px);
+  }
 
-          <div className="monthGrid">
-            {visibleMonthDays.map((day) => {
-              const dayLessons = lessons.filter((lesson) =>
-                sameLocalDay(new Date(lesson.starts_at), day)
-              );
-              const isToday = sameLocalDay(day, new Date());
-              const isCurrentMonth = sameLocalMonth(day, visibleMonthDate);
+  .floatingQuickAction {
+    right: 18px;
+    bottom: 76px;
+  }
 
-              return (
-                <article
-                  className={`monthCell ${isToday ? "today" : ""} ${
-                    isCurrentMonth ? "" : "outside"
-                  }`}
-                  key={day.toISOString()}
-                >
-                  <div className="monthCellHeader">
-                    <strong className="monthDayNumber">{day.getDate()}</strong>
-                    {!isCurrentMonth ? (
-                      <span className="monthCellMonthHint">
-                        {day.toLocaleDateString("tr-TR", { month: "short" })}
-                      </span>
-                    ) : null}
-                  </div>
+  .floatingPlus {
+    width: 54px;
+    height: 54px;
+  }
+}
 
-                  <div className="monthEventList">
-                    {dayLessons.length === 0 ? (
-                      <div className="monthEventSpacer" />
-                    ) : null}
 
-                    {dayLessons.slice(0, 4).map((lesson) => (
-                      <div
-                        className={`monthEventChip tone-${lessonTone(lesson)}`}
-                        key={lesson.id}
-                        title={`${studentNameFromLesson(lesson)} · ${lesson.title}`}
-                      >
-                        <strong>{studentNameFromLesson(lesson)}</strong>
-                        <span>
-                          {formatTimeLabel(lesson.starts_at)} · {lesson.title}
-                        </span>
-                      </div>
-                    ))}
+/* ============================================================
+   Full-page month calendar layout
+   ============================================================ */
 
-                    {dayLessons.length > 4 ? (
-                      <div className="monthMoreEvents">+{dayLessons.length - 4} daha</div>
-                    ) : null}
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        </section>
+.plannerApp {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  background: #f6f6f7;
+}
 
-        {teacherDashboard ? (
-          <div className="floatingQuickAction">
-            {quickMenuOpen ? (
-              <div className="quickMenu floatingMenu">
-                <button onClick={openStudentModal}>👤 Öğrenci Ekle</button>
-                <button disabled>📅 Ders Ekle</button>
-                <button disabled>🏖️ Tatil Ekle</button>
-                <button disabled>💳 Ödeme Al</button>
-                <button disabled>📝 Ödev Ver</button>
-                <button disabled>✅ Test Oluştur</button>
-              </div>
-            ) : null}
+.plannerSidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-height: 100vh;
+  padding: 22px 16px 16px;
+  border-right: 1px solid #ececef;
+  background: #ffffff;
+}
 
-            <button
-              type="button"
-              className="floatingPlus"
-              onClick={() => setQuickMenuOpen((current) => !current)}
-              aria-expanded={quickMenuOpen}
-              aria-label="Yeni işlem"
-              title="Yeni işlem"
-            >
-              +
-            </button>
-          </div>
-        ) : null}
-      </section>
+.plannerBrand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 8px 16px;
+  border-bottom: 1px solid #f0f0f2;
+}
 
-      {studentPanelOpen ? (
-        <div
-          className="studentDrawerBackdrop"
-          onMouseDown={() => setStudentPanelOpen(false)}
-        >
-          <aside
-            className="studentDrawer"
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <div className="studentDrawerHeader">
-              <div>
-                <span className="eyebrow">ÖĞRENCİLER</span>
-                <h2>Öğrenci listesi</h2>
-                <p>{students.length} aktif öğrenci</p>
-              </div>
-              <button
-                type="button"
-                className="modalClose"
-                onClick={() => setStudentPanelOpen(false)}
-                aria-label="Kapat"
-              >
-                ×
-              </button>
-            </div>
+.plannerBrand strong {
+  display: block;
+  font-size: 24px;
+}
 
-            {students.length === 0 ? (
-              <div className="drawerEmpty">Henüz öğrenci eklenmedi.</div>
-            ) : (
-              <div className="studentList drawerStudentList">
-                {students.map((student) => (
-                  <article className="studentRow" key={student.id}>
-                    <div className="studentAvatar">
-                      {student.first_name.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="studentInfo">
-                      <strong>
-                        {student.first_name} {student.last_name}
-                      </strong>
-                      <span>
-                        {[student.subject, student.grade_level]
-                          .filter(Boolean)
-                          .join(" · ") || "Ders bilgisi eklenmedi"}
-                      </span>
-                    </div>
-                    <div className="studentFee">
-                      {Number(student.default_lesson_fee || 0).toFixed(2)} €
-                      <span>/ ders</span>
-                    </div>
-                    <button
-                      type="button"
-                      className="studentDeleteButton"
-                      onClick={() => {
-                        setStudentPanelOpen(false);
-                        setStudentToDelete(student);
-                      }}
-                      aria-label={`${student.first_name} ${student.last_name} öğrencisini sil`}
-                      title="Öğrenciyi sil"
-                    >
-                      🗑
-                    </button>
-                  </article>
-                ))}
-              </div>
-            )}
+.plannerBrand p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
 
-            <button
-              type="button"
-              className="primaryButton drawerAddButton"
-              onClick={() => {
-                setStudentPanelOpen(false);
-                openStudentModal();
-              }}
-            >
-              + Yeni öğrenci
-            </button>
-          </aside>
-        </div>
-      ) : null}
+.plannerBrandMark {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--orange);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  position: relative;
+  box-shadow: 0 10px 24px rgba(244, 124, 60, 0.25);
+}
 
-      {studentToDelete ? (
-        <div
-          className="modalBackdrop"
-          onMouseDown={() => {
-            if (!deletingStudent) setStudentToDelete(null);
-          }}
-        >
-          <section
-            className="confirmCard"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="delete-student-title"
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <div className="dangerIcon">🗑</div>
-            <h2 id="delete-student-title">Öğrenciyi sil?</h2>
-            <p>
-              <strong>
-                {studentToDelete.first_name} {studentToDelete.last_name}
-              </strong>{" "}
-              silinecek. Bu öğrenciye bağlı dersler, veli kayıtları, ödevler,
-              test kayıtları ve ödeme hareketleri de silinir.
-            </p>
+.sidebarBlock {
+  display: grid;
+  gap: 8px;
+}
 
-            <div className="confirmActions">
-              <button
-                type="button"
-                className="secondaryButton"
-                onClick={() => setStudentToDelete(null)}
-                disabled={deletingStudent}
-              >
-                Vazgeç
-              </button>
-              <button
-                type="button"
-                className="dangerButton"
-                onClick={handleDeleteStudent}
-                disabled={deletingStudent}
-              >
-                {deletingStudent ? "Siliniyor…" : "Evet, öğrenciyi sil"}
-              </button>
-            </div>
-          </section>
-        </div>
-      ) : null}
+.sidebarBlockTitle {
+  padding: 0 8px;
+  color: #9aa0a8;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
 
-      {studentModalOpen ? (
-        <div className="modalBackdrop" onMouseDown={closeStudentModal}>
-          <section
-            className="modalCard"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="student-modal-title"
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <div className="modalHeader">
-              <div>
-                <span className="eyebrow">YENİ KAYIT</span>
-                <h2 id="student-modal-title">Öğrenci Ekle</h2>
-              </div>
-              <button
-                className="modalClose"
-                onClick={closeStudentModal}
-                aria-label="Kapat"
-                type="button"
-              >
-                ×
-              </button>
-            </div>
+.sidebarListItem {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  border-radius: 14px;
+  padding: 12px 12px;
+  background: transparent;
+  color: #58606b;
+  text-align: left;
+}
 
-            <form className="studentForm" onSubmit={handleAddStudent}>
-              <div className="stepper stepperThree">
-                <button
-                  type="button"
-                  className={`stepItem ${studentStep === 1 ? "active" : studentStep > 1 ? "done" : ""}`}
-                  onClick={() => setStudentStep(1)}
-                >
-                  <span>1</span>
-                  <div>
-                    <strong>Öğrenci bilgileri</strong>
-                    <small>Temel bilgiler ve ücret</small>
-                  </div>
-                </button>
+.sidebarListItem span {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: #f7f7f8;
+  font-size: 16px;
+}
 
-                <div className="stepLine" />
+.sidebarListItem b {
+  font-size: 15px;
+}
 
-                <button
-                  type="button"
-                  className={`stepItem ${studentStep === 2 ? "active" : studentStep > 2 ? "done" : ""}`}
-                  onClick={() => {
-                    if (studentStep === 1) goToGuardianStep();
-                    else setStudentStep(2);
-                  }}
-                >
-                  <span>2</span>
-                  <div>
-                    <strong>Veli ve iletişim</strong>
-                    <small>İletişim ve WhatsApp</small>
-                  </div>
-                </button>
+.sidebarListItem.active {
+  background: #fff2ea;
+  color: var(--orange-dark);
+}
 
-                <div className="stepLine" />
+.sidebarListItem.active span {
+  background: #ffdcca;
+}
 
-                <button
-                  type="button"
-                  className={`stepItem ${studentStep === 3 ? "active" : ""}`}
-                  onClick={() => {
-                    if (studentStep === 1) {
-                      goToGuardianStep();
-                      return;
-                    }
-                    goToScheduleStep();
-                  }}
-                >
-                  <span>3</span>
-                  <div>
-                    <strong>Ders programı</strong>
-                    <small>Tarih, saat ve tekrar</small>
-                  </div>
-                </button>
-              </div>
+.sidebarListItem:hover:not(:disabled) {
+  background: #fafafa;
+}
 
-              {studentStep === 1 ? (
-                <div className="stepPanel">
-                  <div className="stepPanelHeader">
-                    <span className="eyebrow">ADIM 1 / 3</span>
-                    <h3>Öğrenci bilgileri</h3>
-                    <p>Öğrencinin temel bilgilerini ve ücretini gir.</p>
-                  </div>
+.sidebarListItem:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
 
-                  <div className="formGrid">
-                    <label>
-                      Ad *
-                      <input
-                        value={studentForm.firstName}
-                        onChange={(event) =>
-                          updateStudentField("firstName", event.target.value)
-                        }
-                        placeholder="Örn. Asel"
-                        required
-                      />
-                    </label>
+.sidebarMeta {
+  margin-top: 4px;
+}
 
-                    <label>
-                      Soyad *
-                      <input
-                        value={studentForm.lastName}
-                        onChange={(event) =>
-                          updateStudentField("lastName", event.target.value)
-                        }
-                        placeholder="Soyadı"
-                        required
-                      />
-                    </label>
+.sidebarStat {
+  padding: 14px 14px;
+  border: 1px solid #efeff1;
+  border-radius: 16px;
+  background: #fbfbfb;
+}
 
-                    <label>
-                      Doğum tarihi
-                      <input
-                        type="date"
-                        value={studentForm.birthDate}
-                        onChange={(event) =>
-                          updateStudentField("birthDate", event.target.value)
-                        }
-                      />
-                    </label>
+.sidebarStat strong,
+.sidebarStat span {
+  display: block;
+}
 
-                    <label>
-                      Sınıf / seviye
-                      <input
-                        value={studentForm.gradeLevel}
-                        onChange={(event) =>
-                          updateStudentField("gradeLevel", event.target.value)
-                        }
-                        placeholder="Örn. 3. sınıf / A1"
-                      />
-                    </label>
+.sidebarStat strong {
+  font-size: 26px;
+  line-height: 1;
+}
 
-                    <label>
-                      Ders
-                      <input
-                        value={studentForm.subject}
-                        onChange={(event) =>
-                          updateStudentField("subject", event.target.value)
-                        }
-                        placeholder="Örn. İngilizce"
-                      />
-                    </label>
+.sidebarStat span {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
 
-                    <label>
-                      Ders başına ücret (€)
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={studentForm.defaultLessonFee}
-                        onChange={(event) =>
-                          updateStudentField(
-                            "defaultLessonFee",
-                            event.target.value
-                          )
-                        }
-                      />
-                    </label>
+.sidebarFooter {
+  margin-top: auto;
+  display: grid;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid #f0f0f2;
+}
 
-                    <label>
-                      Başlangıç bakiyesi (€)
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={studentForm.startingBalance}
-                        onChange={(event) =>
-                          updateStudentField(
-                            "startingBalance",
-                            event.target.value
-                          )
-                        }
-                      />
-                    </label>
+.sidebarUser small,
+.sidebarUser strong {
+  display: block;
+}
 
-                    <label className="fullWidth">
-                      Öğretmen özel notu
-                      <textarea
-                        value={studentForm.privateNote}
-                        onChange={(event) =>
-                          updateStudentField("privateNote", event.target.value)
-                        }
-                        placeholder="Bu not yalnızca öğretmen tarafında kullanılacak."
-                        rows={3}
-                      />
-                    </label>
-                  </div>
-                </div>
-              ) : studentStep === 2 ? (
-                <div className="stepPanel">
-                  <div className="stepPanelHeader">
-                    <span className="eyebrow">ADIM 2 / 3</span>
-                    <h3>Veli ve iletişim</h3>
-                    <p>Veli iletişim bilgilerini ve WhatsApp numarasını ekle.</p>
-                  </div>
+.sidebarUser small {
+  color: #9aa0a8;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
 
-                  <div className="formGrid">
-                    <label>
-                      Veli adı *
-                      <input
-                        value={studentForm.guardianFirstName}
-                        onChange={(event) =>
-                          updateStudentField(
-                            "guardianFirstName",
-                            event.target.value
-                          )
-                        }
-                        placeholder="Veli adı"
-                        required
-                      />
-                    </label>
+.sidebarUser strong {
+  margin-top: 4px;
+  font-size: 15px;
+}
 
-                    <label>
-                      Veli soyadı *
-                      <input
-                        value={studentForm.guardianLastName}
-                        onChange={(event) =>
-                          updateStudentField(
-                            "guardianLastName",
-                            event.target.value
-                          )
-                        }
-                        placeholder="Veli soyadı"
-                        required
-                      />
-                    </label>
+.sidebarLogout {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: #fff;
+  color: var(--ink);
+  font-weight: 700;
+}
 
-                    <label>
-                      Telefon
-                      <input
-                        type="tel"
-                        value={studentForm.guardianPhone}
-                        onChange={(event) =>
-                          updateStudentField("guardianPhone", event.target.value)
-                        }
-                        placeholder="+49..."
-                      />
-                    </label>
+.plannerWorkspace {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+}
 
-                    <label>
-                      WhatsApp numarası
-                      <input
-                        type="tel"
-                        value={studentForm.guardianWhatsapp}
-                        onChange={(event) =>
-                          updateStudentField(
-                            "guardianWhatsapp",
-                            event.target.value
-                          )
-                        }
-                        placeholder="+49..."
-                      />
-                    </label>
+.plannerTopbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 14px;
+}
 
-                    <label className="fullWidth">
-                      E-posta
-                      <input
-                        type="email"
-                        value={studentForm.guardianEmail}
-                        onChange={(event) =>
-                          updateStudentField("guardianEmail", event.target.value)
-                        }
-                        placeholder="veli@email.com"
-                      />
-                    </label>
-                  </div>
+.plannerTopbarLeft h1 {
+  margin: 0;
+  font-size: clamp(34px, 4vw, 54px);
+  line-height: 1;
+  letter-spacing: -0.045em;
+  text-transform: capitalize;
+}
 
-                  <label className="toggleRow">
-                    <input
-                      type="checkbox"
-                      checked={studentForm.secondGuardianEnabled}
-                      onChange={(event) =>
-                        updateStudentField(
-                          "secondGuardianEnabled",
-                          event.target.checked
-                        )
-                      }
-                    />
-                    <span>İkinci veli ekle</span>
-                  </label>
+.plannerTopbarLeft p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
 
-                  {studentForm.secondGuardianEnabled ? (
-                    <div className="secondGuardianBox">
-                      <div className="secondGuardianHeader">
-                        <strong>İkinci veli</strong>
-                        <small>Opsiyonel iletişim bilgileri</small>
-                      </div>
+.plannerTopbarRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
 
-                      <div className="formGrid">
-                        <label>
-                          Ad *
-                          <input
-                            value={studentForm.secondGuardianFirstName}
-                            onChange={(event) =>
-                              updateStudentField(
-                                "secondGuardianFirstName",
-                                event.target.value
-                              )
-                            }
-                            placeholder="Ad"
-                            required
-                          />
-                        </label>
+.viewSwitchPill,
+.plannerNavButtons {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid #ececef;
+}
 
-                        <label>
-                          Soyad *
-                          <input
-                            value={studentForm.secondGuardianLastName}
-                            onChange={(event) =>
-                              updateStudentField(
-                                "secondGuardianLastName",
-                                event.target.value
-                              )
-                            }
-                            placeholder="Soyad"
-                            required
-                          />
-                        </label>
+.viewSwitchPill button,
+.plannerNavButtons button {
+  border: 0;
+  background: transparent;
+  color: #6e7580;
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-weight: 700;
+}
 
-                        <label>
-                          Telefon
-                          <input
-                            type="tel"
-                            value={studentForm.secondGuardianPhone}
-                            onChange={(event) =>
-                              updateStudentField(
-                                "secondGuardianPhone",
-                                event.target.value
-                              )
-                            }
-                            placeholder="+49..."
-                          />
-                        </label>
+.viewSwitchPill button.active {
+  background: #ededf0;
+  color: var(--ink);
+}
 
-                        <label>
-                          WhatsApp numarası
-                          <input
-                            type="tel"
-                            value={studentForm.secondGuardianWhatsapp}
-                            onChange={(event) =>
-                              updateStudentField(
-                                "secondGuardianWhatsapp",
-                                event.target.value
-                              )
-                            }
-                            placeholder="+49..."
-                          />
-                        </label>
+.viewSwitchPill button:disabled {
+  opacity: 1;
+  cursor: default;
+}
 
-                        <label className="fullWidth">
-                          E-posta
-                          <input
-                            type="email"
-                            value={studentForm.secondGuardianEmail}
-                            onChange={(event) =>
-                              updateStudentField(
-                                "secondGuardianEmail",
-                                event.target.value
-                              )
-                            }
-                            placeholder="veli2@email.com"
-                          />
-                        </label>
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              ) : (
-                <div className="stepPanel">
-                  <div className="stepPanelHeader">
-                    <span className="eyebrow">ADIM 3 / 3</span>
-                    <h3>Ders programı</h3>
-                    <p>İlk dersi planla; istersen haftalık olarak otomatik tekrarla.</p>
-                  </div>
+.plannerNavButtons button {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+}
 
-                  <label className="toggleRow scheduleToggle">
-                    <input
-                      type="checkbox"
-                      checked={studentForm.scheduleEnabled}
-                      onChange={(event) =>
-                        updateStudentField(
-                          "scheduleEnabled",
-                          event.target.checked
-                        )
-                      }
-                    />
-                    <span>Ders programını şimdi ekle</span>
-                  </label>
+.plannerNavButtons .todayGhostButton {
+  width: auto;
+  padding: 0 18px;
+  font-size: 15px;
+}
 
-                  {studentForm.scheduleEnabled ? (
-                    <div className="formGrid">
-                      <label>
-                        İlk ders tarihi *
-                        <input
-                          type="date"
-                          value={studentForm.lessonDate}
-                          onChange={(event) =>
-                            updateStudentField("lessonDate", event.target.value)
-                          }
-                          required
-                        />
-                      </label>
+.plannerToast,
+.calendarError {
+  margin-bottom: 12px;
+}
 
-                      <label>
-                        Başlangıç saati *
-                        <input
-                          type="time"
-                          value={studentForm.lessonTime}
-                          onChange={(event) =>
-                            updateStudentField("lessonTime", event.target.value)
-                          }
-                          required
-                        />
-                      </label>
+.monthPlannerSurface {
+  flex: 1;
+  min-height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #e7e7ea;
+  border-radius: 28px;
+  background: #fff;
+  overflow: hidden;
+  box-shadow: 0 16px 40px rgba(20, 24, 31, 0.04);
+}
 
-                      <label>
-                        Ders süresi
-                        <select
-                          value={studentForm.lessonDuration}
-                          onChange={(event) =>
-                            updateStudentField(
-                              "lessonDuration",
-                              event.target.value
-                            )
-                          }
-                        >
-                          <option value="30">30 dakika</option>
-                          <option value="45">45 dakika</option>
-                          <option value="60">60 dakika</option>
-                          <option value="90">90 dakika</option>
-                          <option value="120">120 dakika</option>
-                        </select>
-                      </label>
+.monthWeekdayRow {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border-bottom: 1px solid #ececef;
+  background: #fff;
+}
 
-                      <label>
-                        Ders tipi
-                        <select
-                          value={studentForm.lessonType}
-                          onChange={(event) =>
-                            updateStudentField(
-                              "lessonType",
-                              event.target.value as "online" | "in_person"
-                            )
-                          }
-                        >
-                          <option value="online">Online</option>
-                          <option value="in_person">Yüz yüze</option>
-                        </select>
-                      </label>
+.monthWeekdayCell {
+  padding: 16px 12px;
+  text-align: right;
+  color: #767d86;
+  font-size: 13px;
+  font-weight: 700;
+}
 
-                      {studentForm.lessonType === "online" ? (
-                        <label className="fullWidth">
-                          Ders bağlantısı
-                          <input
-                            type="url"
-                            value={studentForm.meetingUrl}
-                            onChange={(event) =>
-                              updateStudentField(
-                                "meetingUrl",
-                                event.target.value
-                              )
-                            }
-                            placeholder="https://meet.google.com/... veya Zoom linki"
-                          />
-                        </label>
-                      ) : null}
+.monthGrid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-auto-rows: minmax(132px, 1fr);
+}
 
-                      <label className="toggleRow fullWidth">
-                        <input
-                          type="checkbox"
-                          checked={studentForm.weeklyRepeat}
-                          onChange={(event) =>
-                            updateStudentField(
-                              "weeklyRepeat",
-                              event.target.checked
-                            )
-                          }
-                        />
-                        <span>Her hafta aynı gün ve saatte tekrar et</span>
-                      </label>
+.monthCell {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 10px 8px;
+  border-right: 1px solid #efeff1;
+  border-bottom: 1px solid #efeff1;
+  background: #fff;
+}
 
-                      {studentForm.weeklyRepeat ? (
-                        <label className="fullWidth">
-                          Tekrar bitiş tarihi *
-                          <input
-                            type="date"
-                            value={studentForm.repeatUntil}
-                            onChange={(event) =>
-                              updateStudentField(
-                                "repeatUntil",
-                                event.target.value
-                              )
-                            }
-                            required
-                          />
-                        </label>
-                      ) : null}
+.monthCell:nth-child(7n) {
+  border-right: 0;
+}
 
-                      <div className="scheduleSummary fullWidth">
-                        <strong>Ders ücreti</strong>
-                        <span>
-                          {Number(studentForm.defaultLessonFee || 0).toFixed(2)} € / ders
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="scheduleSkip">
-                      Öğrenciyi şimdi kaydedip ders programını daha sonra
-                      ekleyebilirsin.
-                    </div>
-                  )}
-                </div>
-              )}
+.monthCell.outside {
+  background: #fafafa;
+}
 
-              {studentError ? (
-                <p className="formError">{studentError}</p>
-              ) : null}
+.monthCell.today {
+  background: #fffaf7;
+}
 
-              <div className="modalActions wizardActions">
-                {studentStep === 1 ? (
-                  <>
-                    <button
-                      type="button"
-                      className="secondaryButton"
-                      onClick={closeStudentModal}
-                    >
-                      Vazgeç
-                    </button>
-                    <button
-                      type="button"
-                      className="primaryButton"
-                      onClick={goToGuardianStep}
-                    >
-                      Devam Et →
-                    </button>
-                  </>
-                ) : studentStep === 2 ? (
-                  <>
-                    <button
-                      type="button"
-                      className="secondaryButton"
-                      onClick={() => {
-                        setStudentError("");
-                        setStudentStep(1);
-                      }}
-                    >
-                      ← Geri
-                    </button>
-                    <button
-                      type="button"
-                      className="primaryButton"
-                      onClick={goToScheduleStep}
-                    >
-                      Devam Et →
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      className="secondaryButton"
-                      onClick={() => {
-                        setStudentError("");
-                        setStudentStep(2);
-                      }}
-                      disabled={studentSaving}
-                    >
-                      ← Geri
-                    </button>
-                    <button
-                      className="primaryButton"
-                      type="submit"
-                      disabled={studentSaving}
-                    >
-                      {studentSaving ? "Kaydediliyor…" : "Öğrenciyi Kaydet"}
-                    </button>
-                  </>
-                )}
-              </div>
-            </form>
-          </section>
-        </div>
-      ) : null}
-    </main>
-  );
+.monthCellHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.monthDayNumber {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.monthCell.today .monthDayNumber {
+  background: #ff4e45;
+  color: #fff;
+}
+
+.monthCell.outside .monthDayNumber {
+  color: #b4b7bc;
+}
+
+.monthCellMonthHint {
+  color: #b1b5bb;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.monthEventList {
+  display: grid;
+  gap: 6px;
+  min-height: 0;
+}
+
+.monthEventSpacer {
+  min-height: 8px;
+}
+
+.monthEventChip {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+
+.monthEventChip strong,
+.monthEventChip span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.monthEventChip strong {
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.monthEventChip span {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.monthMoreEvents {
+  margin-top: 2px;
+  color: #8d939b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.floatingQuickAction {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 60;
+}
+
+.floatingPlus {
+  width: 64px;
+  height: 64px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--orange);
+  color: #fff;
+  font-size: 34px;
+  line-height: 1;
+  box-shadow: 0 18px 36px rgba(244, 124, 60, 0.35);
+}
+
+.quickMenu.floatingMenu {
+  top: auto;
+  right: 0;
+  bottom: 76px;
+  width: 230px;
+}
+
+.studentDrawerBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(21, 24, 30, 0.18);
+  backdrop-filter: blur(2px);
+}
+
+.studentDrawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: min(500px, 92vw);
+  height: 100%;
+  overflow: auto;
+  padding: 26px;
+  background: #fff;
+  box-shadow: -18px 0 55px rgba(20, 24, 31, 0.14);
+}
+
+.studentDrawerHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.studentDrawerHeader h2 {
+  margin: 6px 0 3px;
+  font-size: 25px;
+}
+
+.studentDrawerHeader p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.drawerStudentList {
+  margin: 18px 0;
+}
+
+.drawerEmpty {
+  margin: 28px 0;
+  padding: 30px 15px;
+  border: 1px dashed #dedee2;
+  border-radius: 16px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.drawerAddButton {
+  width: 100%;
+}
+
+@media (max-width: 1150px) {
+  .plannerApp {
+    grid-template-columns: 82px minmax(0, 1fr);
+  }
+
+  .plannerBrand {
+    justify-content: center;
+  }
+
+  .plannerBrand > div:last-child,
+  .sidebarBlockTitle,
+  .sidebarListItem b,
+  .sidebarMeta,
+  .sidebarFooter {
+    display: none;
+  }
+
+  .sidebarListItem {
+    justify-content: center;
+    padding: 10px;
+  }
+
+  .sidebarListItem span {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+@media (max-width: 860px) {
+  .plannerApp {
+    grid-template-columns: 1fr;
+  }
+
+  .plannerSidebar {
+    min-height: auto;
+    gap: 10px;
+    padding: 12px;
+    border-right: 0;
+    border-bottom: 1px solid #ececef;
+  }
+
+  .plannerBrand,
+  .sidebarFooter,
+  .sidebarMeta {
+    display: none;
+  }
+
+  .sidebarBlock {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    overflow: auto;
+  }
+
+  .sidebarBlockTitle {
+    display: none;
+  }
+
+  .sidebarListItem {
+    justify-content: center;
+  }
+
+  .sidebarListItem b {
+    display: none;
+  }
+
+  .plannerTopbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .plannerTopbarRight {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .monthPlannerSurface {
+    min-height: 760px;
+  }
+}
+
+@media (max-width: 680px) {
+  .plannerWorkspace {
+    padding: 10px;
+  }
+
+  .plannerTopbarLeft h1 {
+    font-size: 32px;
+  }
+
+  .plannerTopbarLeft p {
+    font-size: 12px;
+  }
+
+  .viewSwitchPill button {
+    padding: 9px 12px;
+    font-size: 13px;
+  }
+
+  .plannerNavButtons button {
+    width: 38px;
+    height: 38px;
+  }
+
+  .monthWeekdayCell {
+    padding: 10px 6px;
+    font-size: 11px;
+  }
+
+  .monthGrid {
+    grid-auto-rows: minmax(110px, 1fr);
+  }
+
+  .monthCell {
+    padding: 7px 6px;
+  }
+
+  .monthEventChip {
+    padding: 5px 6px;
+  }
+
+  .monthEventChip strong {
+    font-size: 11px;
+  }
+
+  .monthEventChip span {
+    font-size: 10px;
+  }
+
+  .floatingQuickAction {
+    right: 16px;
+    bottom: 16px;
+  }
+
+  .floatingPlus {
+    width: 58px;
+    height: 58px;
+  }
 }
