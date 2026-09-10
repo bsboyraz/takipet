@@ -933,3 +933,240 @@ button {
     display: none;
   }
 }
+
+
+/* ===== Real weekly calendar + student deletion ===== */
+
+.weekCalendarCard {
+  margin: 18px 0;
+  padding: 22px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+}
+
+.calendarTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.calendarTop h2 {
+  margin: 5px 0 0;
+  font-size: 24px;
+}
+
+.calendarNav {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.calendarNavButton,
+.calendarTodayButton {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  border-radius: 11px;
+  height: 38px;
+}
+
+.calendarNavButton {
+  width: 38px;
+}
+
+.calendarTodayButton {
+  padding: 0 13px;
+  font-weight: 700;
+}
+
+.weekCalendarScroll {
+  overflow-x: auto;
+  padding-bottom: 5px;
+}
+
+.weekCalendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(145px, 1fr));
+  min-width: 1015px;
+  border: 1px solid var(--line);
+  border-radius: 17px;
+  overflow: hidden;
+}
+
+.calendarDayColumn {
+  min-height: 245px;
+  background: #fff;
+  border-right: 1px solid var(--line);
+}
+
+.calendarDayColumn:last-child {
+  border-right: 0;
+}
+
+.calendarDayColumn.today {
+  background: #fffaf7;
+}
+
+.calendarDayHeader {
+  min-height: 64px;
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.calendarDayHeader span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.calendarDayHeader strong {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 15px;
+}
+
+.calendarDayColumn.today .calendarDayHeader strong {
+  color: #fff;
+  background: var(--orange);
+}
+
+.calendarDayLessons {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 9px;
+}
+
+.calendarEmptyDay {
+  padding-top: 20px;
+  text-align: center;
+  color: #c6c8cd;
+}
+
+.calendarLesson {
+  padding: 10px;
+  border-radius: 12px;
+  background: #fff1e8;
+  border: 1px solid #f8d7c3;
+  display: grid;
+  gap: 4px;
+}
+
+.calendarLessonTime {
+  color: var(--orange-dark);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.calendarLesson strong {
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.calendarLesson span,
+.calendarLesson small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.calendarLesson a {
+  margin-top: 3px;
+  color: var(--orange-dark);
+  font-size: 11px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.studentDeleteButton {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  background: transparent;
+  opacity: 0.5;
+}
+
+.studentDeleteButton:hover {
+  opacity: 1;
+  background: #fff1f1;
+  border-color: #f4d0d0;
+}
+
+.confirmCard {
+  width: min(440px, 100%);
+  padding: 28px;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 28px 80px rgba(20, 23, 29, 0.25);
+  text-align: center;
+}
+
+.confirmCard h2 {
+  margin: 14px 0 8px;
+}
+
+.confirmCard p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.dangerIcon {
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  margin: 0 auto;
+  border-radius: 17px;
+  background: #fff0f0;
+  font-size: 23px;
+}
+
+.confirmActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.dangerButton {
+  border: 0;
+  border-radius: 14px;
+  padding: 13px 15px;
+  background: #c84545;
+  color: #fff;
+  font-weight: 800;
+}
+
+.dangerButton:disabled {
+  opacity: 0.6;
+}
+
+@media (max-width: 650px) {
+  .calendarTop {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .studentDeleteButton {
+    margin-left: auto;
+  }
+
+  .confirmActions {
+    grid-template-columns: 1fr;
+  }
+}
