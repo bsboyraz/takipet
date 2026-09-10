@@ -1781,3 +1781,620 @@ button {
     height: 54px;
   }
 }
+
+
+/* ============================================================
+   Full-page month calendar layout
+   ============================================================ */
+
+.plannerApp {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  background: #f6f6f7;
+}
+
+.plannerSidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-height: 100vh;
+  padding: 22px 16px 16px;
+  border-right: 1px solid #ececef;
+  background: #ffffff;
+}
+
+.plannerBrand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 8px 16px;
+  border-bottom: 1px solid #f0f0f2;
+}
+
+.plannerBrand strong {
+  display: block;
+  font-size: 24px;
+}
+
+.plannerBrand p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.plannerBrandMark {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--orange);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  position: relative;
+  box-shadow: 0 10px 24px rgba(244, 124, 60, 0.25);
+}
+
+.sidebarBlock {
+  display: grid;
+  gap: 8px;
+}
+
+.sidebarBlockTitle {
+  padding: 0 8px;
+  color: #9aa0a8;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.sidebarListItem {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  border-radius: 14px;
+  padding: 12px 12px;
+  background: transparent;
+  color: #58606b;
+  text-align: left;
+}
+
+.sidebarListItem span {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: #f7f7f8;
+  font-size: 16px;
+}
+
+.sidebarListItem b {
+  font-size: 15px;
+}
+
+.sidebarListItem.active {
+  background: #fff2ea;
+  color: var(--orange-dark);
+}
+
+.sidebarListItem.active span {
+  background: #ffdcca;
+}
+
+.sidebarListItem:hover:not(:disabled) {
+  background: #fafafa;
+}
+
+.sidebarListItem:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.sidebarMeta {
+  margin-top: 4px;
+}
+
+.sidebarStat {
+  padding: 14px 14px;
+  border: 1px solid #efeff1;
+  border-radius: 16px;
+  background: #fbfbfb;
+}
+
+.sidebarStat strong,
+.sidebarStat span {
+  display: block;
+}
+
+.sidebarStat strong {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.sidebarStat span {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.sidebarFooter {
+  margin-top: auto;
+  display: grid;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid #f0f0f2;
+}
+
+.sidebarUser small,
+.sidebarUser strong {
+  display: block;
+}
+
+.sidebarUser small {
+  color: #9aa0a8;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sidebarUser strong {
+  margin-top: 4px;
+  font-size: 15px;
+}
+
+.sidebarLogout {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: #fff;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.plannerWorkspace {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+}
+
+.plannerTopbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 14px;
+}
+
+.plannerTopbarLeft h1 {
+  margin: 0;
+  font-size: clamp(34px, 4vw, 54px);
+  line-height: 1;
+  letter-spacing: -0.045em;
+  text-transform: capitalize;
+}
+
+.plannerTopbarLeft p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.plannerTopbarRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.viewSwitchPill,
+.plannerNavButtons {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid #ececef;
+}
+
+.viewSwitchPill button,
+.plannerNavButtons button {
+  border: 0;
+  background: transparent;
+  color: #6e7580;
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-weight: 700;
+}
+
+.viewSwitchPill button.active {
+  background: #ededf0;
+  color: var(--ink);
+}
+
+.viewSwitchPill button:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+.plannerNavButtons button {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+}
+
+.plannerNavButtons .todayGhostButton {
+  width: auto;
+  padding: 0 18px;
+  font-size: 15px;
+}
+
+.plannerToast,
+.calendarError {
+  margin-bottom: 12px;
+}
+
+.monthPlannerSurface {
+  flex: 1;
+  min-height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #e7e7ea;
+  border-radius: 28px;
+  background: #fff;
+  overflow: hidden;
+  box-shadow: 0 16px 40px rgba(20, 24, 31, 0.04);
+}
+
+.monthWeekdayRow {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border-bottom: 1px solid #ececef;
+  background: #fff;
+}
+
+.monthWeekdayCell {
+  padding: 16px 12px;
+  text-align: right;
+  color: #767d86;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.monthGrid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-auto-rows: minmax(132px, 1fr);
+}
+
+.monthCell {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 10px 8px;
+  border-right: 1px solid #efeff1;
+  border-bottom: 1px solid #efeff1;
+  background: #fff;
+}
+
+.monthCell:nth-child(7n) {
+  border-right: 0;
+}
+
+.monthCell.outside {
+  background: #fafafa;
+}
+
+.monthCell.today {
+  background: #fffaf7;
+}
+
+.monthCellHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.monthDayNumber {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.monthCell.today .monthDayNumber {
+  background: #ff4e45;
+  color: #fff;
+}
+
+.monthCell.outside .monthDayNumber {
+  color: #b4b7bc;
+}
+
+.monthCellMonthHint {
+  color: #b1b5bb;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.monthEventList {
+  display: grid;
+  gap: 6px;
+  min-height: 0;
+}
+
+.monthEventSpacer {
+  min-height: 8px;
+}
+
+.monthEventChip {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+
+.monthEventChip strong,
+.monthEventChip span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.monthEventChip strong {
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.monthEventChip span {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.monthMoreEvents {
+  margin-top: 2px;
+  color: #8d939b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.floatingQuickAction {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 60;
+}
+
+.floatingPlus {
+  width: 64px;
+  height: 64px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--orange);
+  color: #fff;
+  font-size: 34px;
+  line-height: 1;
+  box-shadow: 0 18px 36px rgba(244, 124, 60, 0.35);
+}
+
+.quickMenu.floatingMenu {
+  top: auto;
+  right: 0;
+  bottom: 76px;
+  width: 230px;
+}
+
+.studentDrawerBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(21, 24, 30, 0.18);
+  backdrop-filter: blur(2px);
+}
+
+.studentDrawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: min(500px, 92vw);
+  height: 100%;
+  overflow: auto;
+  padding: 26px;
+  background: #fff;
+  box-shadow: -18px 0 55px rgba(20, 24, 31, 0.14);
+}
+
+.studentDrawerHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.studentDrawerHeader h2 {
+  margin: 6px 0 3px;
+  font-size: 25px;
+}
+
+.studentDrawerHeader p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.drawerStudentList {
+  margin: 18px 0;
+}
+
+.drawerEmpty {
+  margin: 28px 0;
+  padding: 30px 15px;
+  border: 1px dashed #dedee2;
+  border-radius: 16px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.drawerAddButton {
+  width: 100%;
+}
+
+@media (max-width: 1150px) {
+  .plannerApp {
+    grid-template-columns: 82px minmax(0, 1fr);
+  }
+
+  .plannerBrand {
+    justify-content: center;
+  }
+
+  .plannerBrand > div:last-child,
+  .sidebarBlockTitle,
+  .sidebarListItem b,
+  .sidebarMeta,
+  .sidebarFooter {
+    display: none;
+  }
+
+  .sidebarListItem {
+    justify-content: center;
+    padding: 10px;
+  }
+
+  .sidebarListItem span {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+@media (max-width: 860px) {
+  .plannerApp {
+    grid-template-columns: 1fr;
+  }
+
+  .plannerSidebar {
+    min-height: auto;
+    gap: 10px;
+    padding: 12px;
+    border-right: 0;
+    border-bottom: 1px solid #ececef;
+  }
+
+  .plannerBrand,
+  .sidebarFooter,
+  .sidebarMeta {
+    display: none;
+  }
+
+  .sidebarBlock {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    overflow: auto;
+  }
+
+  .sidebarBlockTitle {
+    display: none;
+  }
+
+  .sidebarListItem {
+    justify-content: center;
+  }
+
+  .sidebarListItem b {
+    display: none;
+  }
+
+  .plannerTopbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .plannerTopbarRight {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .monthPlannerSurface {
+    min-height: 760px;
+  }
+}
+
+@media (max-width: 680px) {
+  .plannerWorkspace {
+    padding: 10px;
+  }
+
+  .plannerTopbarLeft h1 {
+    font-size: 32px;
+  }
+
+  .plannerTopbarLeft p {
+    font-size: 12px;
+  }
+
+  .viewSwitchPill button {
+    padding: 9px 12px;
+    font-size: 13px;
+  }
+
+  .plannerNavButtons button {
+    width: 38px;
+    height: 38px;
+  }
+
+  .monthWeekdayCell {
+    padding: 10px 6px;
+    font-size: 11px;
+  }
+
+  .monthGrid {
+    grid-auto-rows: minmax(110px, 1fr);
+  }
+
+  .monthCell {
+    padding: 7px 6px;
+  }
+
+  .monthEventChip {
+    padding: 5px 6px;
+  }
+
+  .monthEventChip strong {
+    font-size: 11px;
+  }
+
+  .monthEventChip span {
+    font-size: 10px;
+  }
+
+  .floatingQuickAction {
+    right: 16px;
+    bottom: 16px;
+  }
+
+  .floatingPlus {
+    width: 58px;
+    height: 58px;
+  }
+}
