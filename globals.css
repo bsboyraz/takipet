@@ -1,0 +1,290 @@
+:root {
+  --orange: #f47c3c;
+  --orange-dark: #db6428;
+  --ink: #20242c;
+  --muted: #747b86;
+  --line: #e9e9e9;
+  --surface: #ffffff;
+  --bg: #f7f7f8;
+  --green: #e8f5ec;
+  --blue: #eaf3fb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+button {
+  font: inherit;
+}
+
+.shell {
+  width: min(1200px, calc(100% - 32px));
+  margin: 0 auto;
+  padding-bottom: 48px;
+}
+
+.topbar {
+  min-height: 82px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand strong {
+  font-size: 22px;
+}
+
+.brand p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.brandMark {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: var(--orange);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  position: relative;
+  box-shadow: 0 8px 20px rgba(244, 124, 60, 0.24);
+}
+
+.paper {
+  font-size: 26px;
+}
+
+.pen {
+  position: absolute;
+  font-size: 18px;
+  right: 7px;
+  bottom: 5px;
+}
+
+.profileButton,
+.segmented button {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 10px 14px;
+  color: var(--ink);
+}
+
+.hero {
+  border-radius: 28px;
+  padding: 34px;
+  background:
+    radial-gradient(circle at 85% 15%, rgba(255,255,255,.65), transparent 25%),
+    linear-gradient(135deg, #fff2ea, #fff 65%);
+  border: 1px solid #f4e4da;
+  display: flex;
+  gap: 28px;
+  align-items: end;
+  justify-content: space-between;
+}
+
+.hero h1 {
+  margin: 7px 0 10px;
+  font-size: clamp(32px, 5vw, 52px);
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+  max-width: 720px;
+}
+
+.hero p {
+  color: var(--muted);
+  max-width: 680px;
+  line-height: 1.6;
+}
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .13em;
+  color: var(--orange-dark);
+}
+
+.primaryButton {
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 14px;
+  padding: 14px 18px;
+  background: var(--orange);
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(244, 124, 60, 0.22);
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin: 18px 0;
+}
+
+.statCard,
+.calendarCard,
+.sideCard {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+}
+
+.statCard {
+  padding: 18px;
+}
+
+.statCard span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.statCard strong {
+  display: block;
+  margin-top: 10px;
+  font-size: 30px;
+}
+
+.contentGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(270px, .7fr);
+  gap: 18px;
+}
+
+.calendarCard,
+.sideCard {
+  padding: 22px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sectionHeader h2,
+.sideCard h2 {
+  margin: 5px 0 0;
+}
+
+.segmented {
+  display: flex;
+  gap: 6px;
+}
+
+.segmented button {
+  padding: 8px 11px;
+  font-size: 12px;
+}
+
+.segmented .active {
+  background: #fff1e8;
+  color: var(--orange-dark);
+  border-color: #ffd8c2;
+}
+
+.emptyState {
+  min-height: 330px;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  padding: 30px;
+}
+
+.emptyState h3 {
+  margin: 12px 0 4px;
+}
+
+.emptyState p,
+.sideCard p {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.emptyIcon {
+  width: 52px;
+  height: 52px;
+  border-radius: 17px;
+  background: #fff1e8;
+  color: var(--orange);
+  margin: auto;
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+}
+
+.checkItem {
+  margin-top: 10px;
+  padding: 12px;
+  background: var(--green);
+  border-radius: 12px;
+  font-size: 14px;
+}
+
+@media (max-width: 850px) {
+  .statsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .contentGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .primaryButton {
+    width: 100%;
+  }
+}
+
+@media (max-width: 520px) {
+  .shell {
+    width: min(100% - 20px, 1200px);
+  }
+
+  .topbar {
+    min-height: 70px;
+  }
+
+  .hero {
+    padding: 24px 20px;
+    border-radius: 22px;
+  }
+
+  .statsGrid {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .statCard {
+    padding: 14px;
+  }
+
+  .sectionHeader {
+    align-items: flex-start;
+    gap: 12px;
+    flex-direction: column;
+  }
+}
