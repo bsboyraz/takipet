@@ -10,12 +10,37 @@ type Profile = {
   last_name: string | null;
 };
 
-const stats = [
-  { label: "Toplam öğrenci", value: "0" },
-  { label: "Bu hafta ders", value: "0" },
-  { label: "Bekleyen ödev", value: "0" },
-  { label: "Yaklaşan test", value: "0" },
-];
+type Student = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  grade_level: string | null;
+  subject: string | null;
+  default_lesson_fee: number;
+  active: boolean;
+};
+
+type StudentForm = {
+  firstName: string;
+  lastName: string;
+  birthDate: string;
+  gradeLevel: string;
+  subject: string;
+  privateNote: string;
+  startingBalance: string;
+  defaultLessonFee: string;
+};
+
+const emptyStudentForm: StudentForm = {
+  firstName: "",
+  lastName: "",
+  birthDate: "",
+  gradeLevel: "",
+  subject: "",
+  privateNote: "",
+  startingBalance: "0",
+  defaultLessonFee: "0",
+};
 
 const roleLabels: Record<Profile["role"], string> = {
   teacher: "Öğretmen",
@@ -25,12 +50,25 @@ const roleLabels: Record<Profile["role"], string> = {
 
 export default function Home() {
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [students, setStudents] = useState<Student[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [studentSaving, setStudentSaving] = useState(false);
+
   const [error, setError] = useState("");
+  const [studentError, setStudentError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+
+  const [quickMenuOpen, setQuickMenuOpen] = useState(false);
+  const [studentModalOpen, setStudentModalOpen] = useState(false);
+  const [studentForm, setStudentForm] =
+    useState<StudentForm>(emptyStudentForm);
 
   useEffect(() => {
     let active = true;
@@ -55,10 +93,17 @@ export default function Home() {
 
       if (!active) return;
 
-      if (profileError) {
+      if (profileError || !data) {
         setError("Profil bilgileri yüklenemedi.");
-      } else {
-        setProfile(data as Profile);
+        setLoading(false);
+        return;
+      }
+
+      const loadedProfile = data as Profile;
+      setProfile(loadedProfile);
+
+      if (loadedProfile.role === "teacher") {
+        await loadStudents(loadedProfile.id);
       }
 
       setLoading(false);
@@ -69,7 +114,25 @@ export default function Home() {
     return () => {
       active = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase]);
+
+  async function loadStudents(teacherId: string) {
+    const { data, error: studentsError } = await supabase
+      .from("students")
+      .select(
+        "id, first_name, last_name, grade_level, subject, default_lesson_fee, active"
+      )
+      .eq("teacher_id", teacherId)
+      .order("created_at", { ascending: false });
+
+    if (studentsError) {
+      setError("Öğrenci listesi yüklenemedi.");
+      return;
+    }
+
+    setStudents((data ?? []) as Student[]);
+  }
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -101,7 +164,13 @@ export default function Home() {
       return;
     }
 
-    setProfile(profileData as Profile);
+    const loadedProfile = profileData as Profile;
+    setProfile(loadedProfile);
+
+    if (loadedProfile.role === "teacher") {
+      await loadStudents(loadedProfile.id);
+    }
+
     setPassword("");
     setSubmitting(false);
   }
@@ -109,8 +178,94 @@ export default function Home() {
   async function handleLogout() {
     await supabase.auth.signOut();
     setProfile(null);
+    setStudents([]);
     setEmail("");
     setPassword("");
+  }
+
+  function openStudentModal() {
+    setStudentForm(emptyStudentForm);
+    setStudentError("");
+    setSuccessMessage("");
+    setQuickMenuOpen(false);
+    setStudentModalOpen(true);
+  }
+
+  function closeStudentModal() {
+    if (studentSaving) return;
+    setStudentModalOpen(false);
+    setStudentError("");
+  }
+
+  function updateStudentField<K extends keyof StudentForm>(
+    field: K,
+    value: StudentForm[K]
+  ) {
+    setStudentForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  }
+
+  async function handleAddStudent(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!profile || profile.role !== "teacher") {
+      setStudentError("Bu işlem için öğretmen hesabı gerekir.");
+      return;
+    }
+
+    if (!studentForm.firstName.trim() || !studentForm.lastName.trim()) {
+      setStudentError("Ad ve soyad zorunludur.");
+      return;
+    }
+
+    const startingBalance = Number(studentForm.startingBalance || 0);
+    const lessonFee = Number(studentForm.defaultLessonFee || 0);
+
+    if (Number.isNaN(startingBalance) || Number.isNaN(lessonFee)) {
+      setStudentError("Bakiye ve ders ücreti sayı olmalıdır.");
+      return;
+    }
+
+    if (lessonFee < 0) {
+      setStudentError("Ders ücreti negatif olamaz.");
+      return;
+    }
+
+    setStudentSaving(true);
+    setStudentError("");
+
+    const { error: insertError } = await supabase.from("students").insert({
+      teacher_id: profile.id,
+      first_name: studentForm.firstName.trim(),
+      last_name: studentForm.lastName.trim(),
+      birth_date: studentForm.birthDate || null,
+      grade_level: studentForm.gradeLevel.trim() || null,
+      subject: studentForm.subject.trim() || null,
+      private_note: studentForm.privateNote.trim() || null,
+      starting_balance: startingBalance,
+      default_lesson_fee: lessonFee,
+      active: true,
+    });
+
+    if (insertError) {
+      setStudentError(`Öğrenci kaydedilemedi: ${insertError.message}`);
+      setStudentSaving(false);
+      return;
+    }
+
+    await loadStudents(profile.id);
+    setStudentSaving(false);
+    setStudentModalOpen(false);
+    setStudentForm(emptyStudentForm);
+    setSuccessMessage(
+      `${studentForm.firstName.trim()} ${studentForm.lastName.trim()} başarıyla eklendi.`
+    );
+
+    window.setTimeout(() => {
+      setSuccessMessage("");
+    }, 4000);
   }
 
   if (loading) {
@@ -190,6 +345,8 @@ export default function Home() {
     .filter(Boolean)
     .join(" ");
 
+  const teacherDashboard = profile.role === "teacher";
+
   return (
     <main className="shell">
       <header className="topbar">
@@ -214,59 +371,269 @@ export default function Home() {
         </div>
       </header>
 
+      {successMessage ? (
+        <div className="successToast">{successMessage}</div>
+      ) : null}
+
       <section className="hero">
         <div>
-          <span className="eyebrow">ÖĞRETMEN PANELİ</span>
+          <span className="eyebrow">
+            {teacherDashboard ? "ÖĞRETMEN PANELİ" : "TAKİPET"}
+          </span>
           <h1>Derslerini tek yerden takip et.</h1>
           <p>
             Öğrenci, veli, takvim, ödev, test ve ödeme yönetimi için Takipet
             artık Supabase hesabınla bağlı çalışıyor.
           </p>
         </div>
-        <button className="primaryButton">+ Yeni işlem</button>
+
+        {teacherDashboard ? (
+          <div className="quickActionWrap">
+            <button
+              className="primaryButton"
+              onClick={() => setQuickMenuOpen((current) => !current)}
+              aria-expanded={quickMenuOpen}
+            >
+              + Yeni işlem
+            </button>
+
+            {quickMenuOpen ? (
+              <div className="quickMenu">
+                <button onClick={openStudentModal}>👤 Öğrenci Ekle</button>
+                <button disabled>📅 Ders Ekle</button>
+                <button disabled>🏖️ Tatil Ekle</button>
+                <button disabled>💳 Ödeme Al</button>
+                <button disabled>📝 Ödev Ver</button>
+                <button disabled>✅ Test Oluştur</button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </section>
 
       <section className="statsGrid">
-        {stats.map((stat) => (
-          <article className="statCard" key={stat.label}>
-            <span>{stat.label}</span>
-            <strong>{stat.value}</strong>
-          </article>
-        ))}
+        <article className="statCard">
+          <span>Toplam öğrenci</span>
+          <strong>{students.length}</strong>
+        </article>
+        <article className="statCard">
+          <span>Bu hafta ders</span>
+          <strong>0</strong>
+        </article>
+        <article className="statCard">
+          <span>Bekleyen ödev</span>
+          <strong>0</strong>
+        </article>
+        <article className="statCard">
+          <span>Yaklaşan test</span>
+          <strong>0</strong>
+        </article>
       </section>
 
       <section className="contentGrid">
         <article className="calendarCard">
           <div className="sectionHeader">
             <div>
-              <span className="eyebrow">TAKVİM</span>
-              <h2>Bu hafta</h2>
-            </div>
-            <div className="segmented">
-              <button>Gün</button>
-              <button className="active">Hafta</button>
-              <button>Ay</button>
+              <span className="eyebrow">ÖĞRENCİLER</span>
+              <h2>{students.length ? "Öğrenci listesi" : "Henüz öğrenci yok"}</h2>
             </div>
           </div>
 
-          <div className="emptyState">
-            <div className="emptyIcon">✦</div>
-            <h3>Henüz planlanmış ders yok</h3>
-            <p>
-              Bir sonraki adımda gerçek öğrenci ve ders kayıtlarını ekleyeceğiz.
-            </p>
-          </div>
+          {students.length === 0 ? (
+            <div className="emptyState">
+              <div className="emptyIcon">✦</div>
+              <h3>İlk öğrencini ekleyebilirsin</h3>
+              <p>
+                Sağ üstteki “+ Yeni işlem” butonundan “Öğrenci Ekle” seçeneğini
+                kullan.
+              </p>
+            </div>
+          ) : (
+            <div className="studentList">
+              {students.map((student) => (
+                <article className="studentRow" key={student.id}>
+                  <div className="studentAvatar">
+                    {student.first_name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="studentInfo">
+                    <strong>
+                      {student.first_name} {student.last_name}
+                    </strong>
+                    <span>
+                      {[student.subject, student.grade_level]
+                        .filter(Boolean)
+                        .join(" · ") || "Ders bilgisi eklenmedi"}
+                    </span>
+                  </div>
+                  <div className="studentFee">
+                    {Number(student.default_lesson_fee || 0).toFixed(2)} €
+                    <span>/ ders</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
         </article>
 
         <aside className="sideCard">
           <span className="eyebrow">BAĞLANTI DURUMU</span>
           <h2>Supabase bağlı ✓</h2>
-          <p>Giriş sistemi ve rol profili artık gerçek veritabanından okunuyor.</p>
+          <p>Öğrenci kayıtları artık gerçek veritabanında tutuluyor.</p>
           <div className="checkItem">✓ Kimlik doğrulama</div>
           <div className="checkItem">✓ Öğretmen profili</div>
-          <div className="checkItem">✓ RLS güvenliği</div>
+          <div className="checkItem">✓ Öğrenci ekleme</div>
         </aside>
       </section>
+
+      {studentModalOpen ? (
+        <div className="modalBackdrop" onMouseDown={closeStudentModal}>
+          <section
+            className="modalCard"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="student-modal-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="modalHeader">
+              <div>
+                <span className="eyebrow">YENİ KAYIT</span>
+                <h2 id="student-modal-title">Öğrenci Ekle</h2>
+              </div>
+              <button
+                className="modalClose"
+                onClick={closeStudentModal}
+                aria-label="Kapat"
+                type="button"
+              >
+                ×
+              </button>
+            </div>
+
+            <form className="studentForm" onSubmit={handleAddStudent}>
+              <div className="formGrid">
+                <label>
+                  Ad *
+                  <input
+                    value={studentForm.firstName}
+                    onChange={(event) =>
+                      updateStudentField("firstName", event.target.value)
+                    }
+                    placeholder="Örn. Asel"
+                    required
+                  />
+                </label>
+
+                <label>
+                  Soyad *
+                  <input
+                    value={studentForm.lastName}
+                    onChange={(event) =>
+                      updateStudentField("lastName", event.target.value)
+                    }
+                    placeholder="Soyadı"
+                    required
+                  />
+                </label>
+
+                <label>
+                  Doğum tarihi
+                  <input
+                    type="date"
+                    value={studentForm.birthDate}
+                    onChange={(event) =>
+                      updateStudentField("birthDate", event.target.value)
+                    }
+                  />
+                </label>
+
+                <label>
+                  Sınıf / seviye
+                  <input
+                    value={studentForm.gradeLevel}
+                    onChange={(event) =>
+                      updateStudentField("gradeLevel", event.target.value)
+                    }
+                    placeholder="Örn. 3. sınıf / A1"
+                  />
+                </label>
+
+                <label>
+                  Ders
+                  <input
+                    value={studentForm.subject}
+                    onChange={(event) =>
+                      updateStudentField("subject", event.target.value)
+                    }
+                    placeholder="Örn. İngilizce"
+                  />
+                </label>
+
+                <label>
+                  Ders başına ücret (€)
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={studentForm.defaultLessonFee}
+                    onChange={(event) =>
+                      updateStudentField(
+                        "defaultLessonFee",
+                        event.target.value
+                      )
+                    }
+                  />
+                </label>
+
+                <label>
+                  Başlangıç bakiyesi (€)
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={studentForm.startingBalance}
+                    onChange={(event) =>
+                      updateStudentField("startingBalance", event.target.value)
+                    }
+                  />
+                </label>
+
+                <label className="fullWidth">
+                  Öğretmen özel notu
+                  <textarea
+                    value={studentForm.privateNote}
+                    onChange={(event) =>
+                      updateStudentField("privateNote", event.target.value)
+                    }
+                    placeholder="Bu not yalnızca öğretmen tarafında kullanılacak."
+                    rows={4}
+                  />
+                </label>
+              </div>
+
+              {studentError ? (
+                <p className="formError">{studentError}</p>
+              ) : null}
+
+              <div className="modalActions">
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  onClick={closeStudentModal}
+                  disabled={studentSaving}
+                >
+                  Vazgeç
+                </button>
+                <button
+                  className="primaryButton"
+                  type="submit"
+                  disabled={studentSaving}
+                >
+                  {studentSaving ? "Kaydediliyor…" : "Öğrenciyi Kaydet"}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }
